@@ -1,146 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D FPS Game</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D FPS Game</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #healthBar { position: fixed; top: 10px; left: 10px; background: red; height: 20px; width: 200px; }
+        #score { position: fixed; top: 10px; right: 10px; color: white; font-size: 20px; }
+    </style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
+    <div id="healthBar"></div>
+    <div id="score">Score: 0</div>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.148.0/build/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, player, health = 100, score = 0;
+        let projectiles = [], enemies = [];
+        let movementSpeed = 0.1, shootCooldown = 0;
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script>
-    const canvas = document.getElementById('gameCanvas');
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ canvas });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+        function init() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb); // Skybox color
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-    // Player Settings
-    const player = {
-      position: new THREE.Vector3(0, 1.6, 0), // Player's height is 1.6 meters
-      velocity: new THREE.Vector3(),
-      speed: 0.1,
-      turnSpeed: 0.02,
-    };
+            // Player Setup
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            player = new THREE.Mesh(geometry, material);
+            scene.add(player);
+            camera.position.z = 5;
 
-    let keys = {};
-    const raycaster = new THREE.Raycaster();
-    const clock = new THREE.Clock();
+            // Ground Setup (Flat green plane)
+            const planeGeometry = new THREE.PlaneGeometry(100, 100);
+            const planeMaterial = new THREE.MeshBasicMaterial({ color: 0x008000 });
+            const ground = new THREE.Mesh(planeGeometry, planeMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
 
-    // Initialize Scene
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    const playerCube = new THREE.Mesh(geometry, material);
-    scene.add(playerCube);
+            // Event listeners for player movement
+            document.addEventListener('keydown', onKeyDown, false);
+            document.addEventListener('keyup', onKeyUp, false);
 
-    // Basic Ground
-    const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
-    const groundMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, side: THREE.DoubleSide });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -1;
-    scene.add(ground);
+            // Game Loop
+            animate();
 
-    // Set up Lighting
-    const light = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(light);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(0, 10, 0).normalize();
-    scene.add(directionalLight);
-
-    // Game Loop
-    function animate() {
-      requestAnimationFrame(animate);
-
-      const delta = clock.getDelta();
-
-      // Handle player movement
-      if (keys['w']) player.position.z -= player.speed * delta;
-      if (keys['s']) player.position.z += player.speed * delta;
-      if (keys['a']) player.position.x -= player.speed * delta;
-      if (keys['d']) player.position.x += player.speed * delta;
-
-      // Camera movement based on mouse
-      const mouse = new THREE.Vector2();
-      document.addEventListener('mousemove', (e) => {
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-      });
-
-      camera.rotation.x = mouse.y * 0.5;
-      camera.rotation.y = mouse.x * 0.5;
-
-      camera.position.set(player.position.x, player.position.y, player.position.z + 5);
-
-      // Raycasting for shooting
-      if (keys[' '] && Date.now() - lastShot > 500) {
-        shootProjectile();
-        lastShot = Date.now();
-      }
-
-      // Update scene
-      renderer.render(scene, camera);
-    }
-
-    // Handle key events
-    window.addEventListener('keydown', (event) => {
-      keys[event.key] = true;
-    });
-
-    window.addEventListener('keyup', (event) => {
-      keys[event.key] = false;
-    });
-
-    // Shooting mechanism
-    const projectiles = [];
-    let lastShot = 0;
-
-    function shootProjectile() {
-      const projectileGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-      const projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-      projectile.position.set(player.position.x, player.position.y, player.position.z + 1);
-      scene.add(projectile);
-
-      // Move projectile forward
-      const projectileVelocity = new THREE.Vector3(0, 0, -0.5);
-      projectiles.push({ mesh: projectile, velocity: projectileVelocity });
-    }
-
-    // Update projectiles
-    function updateProjectiles() {
-      for (let i = 0; i < projectiles.length; i++) {
-        projectiles[i].mesh.position.add(projectiles[i].velocity);
-
-        // Check collision with enemies or walls
-        // (Add collision detection here)
-
-        // Remove projectiles out of bounds
-        if (projectiles[i].mesh.position.z < -10) {
-          scene.remove(projectiles[i].mesh);
-          projectiles.splice(i, 1);
-          i--;
+            // Spawn enemies every few seconds
+            setInterval(spawnEnemy, 2000);
         }
-      }
-    }
 
-    // Game initialization
-    function init() {
-      window.addEventListener('resize', () => {
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-      });
+        // Handle player movement
+        let keys = {};
+        function onKeyDown(event) {
+            keys[event.key] = true;
+        }
+        function onKeyUp(event) {
+            keys[event.key] = false;
+        }
 
-      animate();
-    }
+        function movePlayer() {
+            if (keys['w']) player.position.z -= movementSpeed;
+            if (keys['s']) player.position.z += movementSpeed;
+            if (keys['a']) player.position.x -= movementSpeed;
+            if (keys['d']) player.position.x += movementSpeed;
+        }
 
-    init();
-  </script>
+        function shootProjectile() {
+            if (shootCooldown > 0) return; // Prevent shooting too quickly
+            shootCooldown = 0.5; // Reset cooldown
+
+            const projectileGeometry = new THREE.SphereGeometry(0.1);
+            const projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+            projectile.position.set(player.position.x, player.position.y, player.position.z + 1);
+            scene.add(projectile);
+            projectiles.push(projectile);
+
+            // Add sound effect (replace with actual sound)
+            new Audio('shoot.mp3').play();
+        }
+
+        // Handle animation and game loop
+        function animate() {
+            requestAnimationFrame(animate);
+            movePlayer();
+            moveEnemies();
+            checkCollisions();
+            updateUI();
+            renderer.render(scene, camera);
+            shootCooldown -= 0.1; // Update shoot cooldown
+        }
+
+        // Spawn enemies at random locations
+        function spawnEnemy() {
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const enemy = new THREE.Mesh(geometry, material);
+            enemy.position.set(Math.random() * 50 - 25, 0.5, Math.random() * 50 - 25);
+            scene.add(enemy);
+            enemies.push(enemy);
+        }
+
+        // Move enemies in random directions
+        function moveEnemies() {
+            enemies.forEach(enemy => {
+                enemy.position.x += Math.random() * 0.05 - 0.025;
+                enemy.position.z += Math.random() * 0.05 - 0.025;
+            });
+        }
+
+        // Check for collisions between projectiles and enemies
+        function checkCollisions() {
+            projectiles.forEach((projectile, pIndex) => {
+                enemies.forEach((enemy, eIndex) => {
+                    if (projectile.position.distanceTo(enemy.position) < 1) {
+                        // Collision detected
+                        scene.remove(enemy);
+                        scene.remove(projectile);
+                        enemies.splice(eIndex, 1);
+                        projectiles.splice(pIndex, 1);
+                        score += 10; // Increment score for eliminating an enemy
+                    }
+                });
+            });
+        }
+
+        // Update the health bar and score display
+        function updateUI() {
+            document.getElementById('healthBar').style.width = `${health * 2}px`;
+            document.getElementById('score').textContent = `Score: ${score}`;
+        }
+
+        // Start the game
+        init();
+
+        // Fire projectile on spacebar press
+        document.addEventListener('keydown', function(event) {
+            if (event.code === 'Space') {
+                shootProjectile();
+            }
+        });
+    </script>
 </body>
 </html>
