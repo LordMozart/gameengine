@@ -119,7 +119,7 @@
         }
         setInterval(spawnEnemy, 3000);
 
-        // Player shooting
+        // Bullets
         const bullets = [];
         document.addEventListener('keydown', (e) => {
             if (e.key === ' ') shoot();
@@ -129,23 +129,10 @@
             const bulletGeometry = new THREE.SphereGeometry(0.2);
             const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
             const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-            bullet.position.set(player.position.x, player.position.y, player.position.z);
+            bullet.position.copy(player.position);
             bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
             bullets.push(bullet);
             scene.add(bullet);
-        }
-
-        // Health bar and game over
-        const healthBar = document.getElementById('health-bar');
-        let playerHealth = 100;
-
-        function updateHealth(amount) {
-            playerHealth = Math.max(0, playerHealth + amount);
-            healthBar.style.width = `${playerHealth * 3}px`;
-            if (playerHealth <= 0) {
-                document.getElementById('game-over').style.display = 'block';
-                cancelAnimationFrame(animationId);
-            }
         }
 
         // Camera movement with mouse
@@ -168,28 +155,28 @@
         });
 
         // Game loop
-        let animationId;
         function animate() {
-            animationId = requestAnimationFrame(animate);
+            requestAnimationFrame(animate);
 
-            // Player movement
-            const speed = 0.2;
-            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-            if (keys['w']) player.position.add(forward.clone().multiplyScalar(speed));
-            if (keys['s']) player.position.add(forward.clone().multiplyScalar(-speed));
-            if (keys['a']) player.position.add(right.clone().multiplyScalar(-speed));
-            if (keys['d']) player.position.add(right.clone().multiplyScalar(speed));
-
-            // Update bullets and check collisions
+            // Update bullets
             bullets.forEach((bullet, i) => {
-                bullet.position.add(bullet.velocity);
+                bullet.position.add(bullet.velocity.clone().multiplyScalar(0.5));
+
+                // Remove bullets that go out of bounds
+                if (bullet.position.length() > 100) {
+                    scene.remove(bullet);
+                    bullets.splice(i, 1);
+                }
+
+                // Check collision with enemies
                 enemies.forEach((enemy, j) => {
                     if (bullet.position.distanceTo(enemy.position) < 1) {
                         enemy.health -= 50;
-                        enemy.children[0].scale.x = enemy.health / 100;
+                        enemy.children[0].scale.x = enemy.health / 100; // Update health bar
                         scene.remove(bullet);
                         bullets.splice(i, 1);
+
+                        // Remove enemy if health is depleted
                         if (enemy.health <= 0) {
                             scene.remove(enemy);
                             enemies.splice(j, 1);
@@ -201,12 +188,12 @@
             // Rotate enemies
             enemies.forEach(enemy => enemy.rotation.y += 0.01);
 
+            // Update camera position
+            camera.position.set(player.position.x, player.position.y + 2, player.position.z);
+
             renderer.render(scene, camera);
         }
         animate();
-
-        camera.position.set(0, 10, 20);
-        camera.lookAt(0, 0, 0);
     </script>
 </body>
 </html>
