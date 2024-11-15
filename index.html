@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Cube Game</title>
+    <title>3D Cube Game with Gun</title>
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
@@ -19,11 +19,20 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Cube setup
+        // Cube setup (player)
         const geometry = new THREE.BoxGeometry();
         const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         const cube = new THREE.Mesh(geometry, material);
         scene.add(cube);
+
+        // Gun setup (using a PNG image as the texture)
+        const gunTexture = new THREE.TextureLoader().load('https://example.com/your-gun-image.png'); // Replace with actual image URL
+        const gunGeometry = new THREE.PlaneGeometry(1, 0.5); // Plane for the gun
+        const gunMaterial = new THREE.MeshBasicMaterial({ map: gunTexture, transparent: true });
+        const gun = new THREE.Mesh(gunGeometry, gunMaterial);
+        gun.position.set(0, 0.5, 0); // Attach it to the top of the cube (player)
+        gun.rotation.x = Math.PI / 2; // Rotate the gun to align it properly
+        cube.add(gun); // Make the gun part of the cube
 
         // Camera position
         camera.position.z = 5;
@@ -35,12 +44,19 @@
         let moveLeft = false;
         let moveRight = false;
 
+        // Bullet setup (using PNG image for the projectile)
+        const bulletTexture = new THREE.TextureLoader().load('https://example.com/your-bullet-image.png'); // Replace with actual bullet image
+        const bulletGeometry = new THREE.CircleGeometry(0.1, 32); // Use a circle for the bullet
+        const bulletMaterial = new THREE.MeshBasicMaterial({ map: bulletTexture, transparent: true });
+        const bullets = [];
+
         // Event listeners for keypresses
         window.addEventListener('keydown', (event) => {
             if (event.key === 'ArrowUp') moveForward = true;
             if (event.key === 'ArrowDown') moveBackward = true;
             if (event.key === 'ArrowLeft') moveLeft = true;
             if (event.key === 'ArrowRight') moveRight = true;
+            if (event.key === ' ') shootBullet(); // Spacebar to shoot
         });
 
         window.addEventListener('keyup', (event) => {
@@ -50,19 +66,43 @@
             if (event.key === 'ArrowRight') moveRight = false;
         });
 
-        // Disable mouse control (if enabled by default in any other part of the script)
-        // This part is not required for this basic script, but would be if mouse controls were added.
-        document.body.style.cursor = 'default';
+        // Function to shoot bullets
+        function shootBullet() {
+            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+            bullet.position.set(cube.position.x, cube.position.y + 0.5, cube.position.z); // Position it in front of the gun
+            scene.add(bullet);
+            bullets.push(bullet);
+        }
+
+        // Cube movement logic
+        function moveCube() {
+            if (moveForward) cube.position.z -= speed;
+            if (moveBackward) cube.position.z += speed;
+            if (moveLeft) cube.position.x -= speed;
+            if (moveRight) cube.position.x += speed;
+        }
+
+        // Bullet movement logic
+        function moveBullets() {
+            for (let i = 0; i < bullets.length; i++) {
+                bullets[i].position.z -= 0.2; // Move bullets forward
+                if (bullets[i].position.z < -5) {
+                    scene.remove(bullets[i]);
+                    bullets.splice(i, 1);
+                    i--;
+                }
+            }
+        }
 
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
 
-            // Cube movement logic
-            if (moveForward) cube.position.z -= speed;
-            if (moveBackward) cube.position.z += speed;
-            if (moveLeft) cube.position.x -= speed;
-            if (moveRight) cube.position.x += speed;
+            // Move the player (cube)
+            moveCube();
+
+            // Move bullets
+            moveBullets();
 
             // Render the scene
             renderer.render(scene, camera);
