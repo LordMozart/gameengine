@@ -22,11 +22,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/OrbitControls.min.js"></script>
     <script>
-        let scene, camera, renderer, health = 100, score = 0;
-        let player, enemies = [], projectiles = [];
-        let moveSpeed = 0.1, rotateSpeed = 0.01;
-        let crosshair;
-        let gameOver = false;
+        let scene, camera, renderer, player, health = 100, score = 0, enemies = [], projectiles = [];
+        let moveSpeed = 0.1, rotateSpeed = 0.02, gravity = -0.005;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let crosshair, cursorX = 0, cursorY = 0;
+        let lastTime = 0, deltaTime = 0;
 
         // Initialize scene
         function init() {
@@ -36,22 +36,24 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
+            // Player setup
+            let playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+            let playerMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+            player = new THREE.Mesh(playerGeometry, playerMaterial);
+            player.position.y = 1; // Raise the player off the ground
+            scene.add(player);
+
+            // Set camera position and look
+            camera.position.set(0, 1, 5);
+            camera.rotation.x = 0;
+            camera.rotation.y = 0;
+
             // Ground
             let groundGeometry = new THREE.PlaneGeometry(500, 500);
             let groundMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
             let ground = new THREE.Mesh(groundGeometry, groundMaterial);
             ground.rotation.x = Math.PI / -2;
             scene.add(ground);
-
-            // Player
-            let playerGeometry = new THREE.BoxGeometry(1, 1, 1);
-            let playerMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-            player = new THREE.Mesh(playerGeometry, playerMaterial);
-            player.position.y = 0.5;
-            scene.add(player);
-
-            // Set camera position
-            camera.position.set(0, 1, 5);
 
             // Crosshair
             crosshair = document.createElement('div');
@@ -67,6 +69,7 @@
 
             // Event listeners for mouse and keyboard
             window.addEventListener('keydown', onKeyDown);
+            window.addEventListener('keyup', onKeyUp);
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('mousedown', onMouseDown);
             window.addEventListener('resize', onResize);
@@ -80,24 +83,85 @@
 
         // Game loop
         function gameLoop() {
-            if (gameOver) return;
             requestAnimationFrame(gameLoop);
+            deltaTime = (performance.now() - lastTime) / 1000;
+            lastTime = performance.now();
 
             // Update player movement
-            if (moveForward) player.position.z -= moveSpeed;
-            if (moveBackward) player.position.z += moveSpeed;
-            if (moveLeft) player.position.x -= moveSpeed;
-            if (moveRight) player.position.x += moveSpeed;
+            updatePlayerMovement();
 
-            // Update camera
-            camera.position.set(player.position.x, player.position.y + 1, player.position.z + 5);
-            camera.lookAt(player.position);
-
-            // Check for collisions and game over conditions
+            // Check for collisions (projectiles and enemies)
             checkCollisions();
+
+            // Update projectiles
+            updateProjectiles();
 
             // Render the scene
             renderer.render(scene, camera);
+        }
+
+        // Update player movement based on WASD keys
+        function updatePlayerMovement() {
+            let velocity = new THREE.Vector3();
+
+            if (moveForward) velocity.z -= moveSpeed;
+            if (moveBackward) velocity.z += moveSpeed;
+            if (moveLeft) velocity.x -= moveSpeed;
+            if (moveRight) velocity.x += moveSpeed;
+
+            player.position.add(velocity);
+            camera.position.set(player.position.x, player.position.y + 1, player.position.z + 5);
+            camera.lookAt(player.position);
+
+            // Camera control (pitch and yaw)
+            camera.rotation.x = cursorY * rotateSpeed;
+            camera.rotation.y = cursorX * rotateSpeed;
+        }
+
+        // Handle key presses for movement
+        function onKeyDown(event) {
+            switch (event.key) {
+                case 'w': moveForward = true; break;
+                case 's': moveBackward = true; break;
+                case 'a': moveLeft = true; break;
+                case 'd': moveRight = true; break;
+            }
+        }
+
+        function onKeyUp(event) {
+            switch (event.key) {
+                case 'w': moveForward = false; break;
+                case 's': moveBackward = false; break;
+                case 'a': moveLeft = false; break;
+                case 'd': moveRight = false; break;
+            }
+        }
+
+        // Mouse movement for camera control
+        function onMouseMove(event) {
+            cursorX = (event.clientX / window.innerWidth) * 2 - 1;
+            cursorY = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        // Shoot projectiles
+        function onMouseDown() {
+            let projectileGeometry = new THREE.SphereGeometry(0.1, 32, 32);
+            let projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            let projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+            projectile.position.set(player.position.x, player.position.y + 1, player.position.z);
+            scene.add(projectile);
+            projectiles.push(projectile);
+
+            // Move the projectile forward
+            function moveProjectile() {
+                projectile.position.z -= 0.5;
+                if (projectile.position.z < -50) {
+                    scene.remove(projectile);
+                    projectiles.splice(projectiles.indexOf(projectile), 1);
+                }
+            }
+
+            moveProjectile();
         }
 
         // Spawn enemies at random locations
@@ -110,56 +174,7 @@
             enemies.push(enemy);
         }
 
-        // Handle keyboard input for player movement
-        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-        function onKeyDown(event) {
-            switch (event.key) {
-                case 'w': moveForward = true; break;
-                case 's': moveBackward = true; break;
-                case 'a': moveLeft = true; break;
-                case 'd': moveRight = true; break;
-            }
-        }
-        function onKeyUp(event) {
-            switch (event.key) {
-                case 'w': moveForward = false; break;
-                case 's': moveBackward = false; break;
-                case 'a': moveLeft = false; break;
-                case 'd': moveRight = false; break;
-            }
-        }
-
-        // Handle mouse movement for camera control
-        let mouseX = 0, mouseY = 0;
-        function onMouseMove(event) {
-            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-            mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-            camera.rotation.x = mouseY * rotateSpeed;
-            camera.rotation.y = mouseX * rotateSpeed;
-        }
-
-        // Handle shooting projectiles
-        function onMouseDown() {
-            let projectileGeometry = new THREE.SphereGeometry(0.1, 32, 32);
-            let projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-            let projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            projectile.position.set(player.position.x, player.position.y, player.position.z);
-            scene.add(projectile);
-            projectiles.push(projectile);
-
-            // Simple projectile movement
-            function moveProjectile() {
-                projectile.position.z -= 0.5;
-                if (projectile.position.z < -50) {
-                    scene.remove(projectile);
-                    projectiles.splice(projectiles.indexOf(projectile), 1);
-                }
-            }
-
-            moveProjectile();
-        }
-
-        // Collision detection
+        // Check for collisions between projectiles and enemies
         function checkCollisions() {
             projectiles.forEach((projectile, index) => {
                 enemies.forEach((enemy, enemyIndex) => {
@@ -170,6 +185,17 @@
                         enemies.splice(enemyIndex, 1);
                     }
                 });
+            });
+        }
+
+        // Update projectiles and remove when off-screen
+        function updateProjectiles() {
+            projectiles.forEach((projectile) => {
+                projectile.position.z -= 0.5;
+                if (projectile.position.z < -50) {
+                    scene.remove(projectile);
+                    projectiles.splice(projectiles.indexOf(projectile), 1);
+                }
             });
         }
 
