@@ -77,21 +77,6 @@
         player.position.y = 1;
         scene.add(player);
 
-        // Obstacles
-        const obstacles = [];
-        for (let i = 0; i < 10; i++) {
-            const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-            const boxMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 });
-            const box = new THREE.Mesh(boxGeometry, boxMaterial);
-            box.position.set(
-                (Math.random() - 0.5) * 50,
-                0.5,
-                (Math.random() - 0.5) * 50
-            );
-            obstacles.push(box);
-            scene.add(box);
-        }
-
         // Enemies
         const enemies = [];
         function spawnEnemy() {
@@ -112,6 +97,9 @@
             const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
             const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
             healthBar.position.set(0, 1.2, 0);
+            healthBar.lookAt(camera.position); // Initial orientation
+            healthBar.material.depthTest = false; // Ensure it always renders on top
+            enemy.healthBar = healthBar;
             enemy.add(healthBar);
 
             enemies.push(enemy);
@@ -148,8 +136,9 @@
         let cameraRotation = { x: 0, y: 0 };
         document.addEventListener('mousemove', (event) => {
             if (!pointerLocked) return;
-            cameraRotation.y -= event.movementX * 0.002;
-            cameraRotation.x -= event.movementY * 0.002;
+            const sensitivity = 0.002;
+            cameraRotation.y -= event.movementX * sensitivity;
+            cameraRotation.x -= event.movementY * sensitivity;
             cameraRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotation.x));
             camera.rotation.set(cameraRotation.x, cameraRotation.y, 0);
         });
@@ -172,7 +161,7 @@
                 enemies.forEach((enemy, j) => {
                     if (bullet.position.distanceTo(enemy.position) < 1) {
                         enemy.health -= 50;
-                        enemy.children[0].scale.x = enemy.health / 100; // Update health bar
+                        enemy.healthBar.scale.x = enemy.health / 100; // Update health bar
                         scene.remove(bullet);
                         bullets.splice(i, 1);
 
@@ -185,8 +174,13 @@
                 });
             });
 
-            // Rotate enemies
-            enemies.forEach(enemy => enemy.rotation.y += 0.01);
+            // Rotate enemies and update health bars
+            enemies.forEach((enemy) => {
+                enemy.rotation.y += 0.01;
+                if (enemy.healthBar) {
+                    enemy.healthBar.lookAt(camera.position);
+                }
+            });
 
             // Update camera position
             camera.position.set(player.position.x, player.position.y + 2, player.position.z);
