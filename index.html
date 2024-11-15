@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Game</title>
+    <title>3D Game with Collisions and Healthbars</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.155.0/three.min.js"></script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
+            cursor: none; /* Hide cursor */
         }
         canvas {
             display: block;
@@ -31,11 +32,24 @@
             color: white;
             text-shadow: 2px 2px 4px black;
         }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
     <div id="health-bar"></div>
     <div id="game-over">Game Over</div>
+    <div id="crosshair"></div>
     <script>
         // Scene, camera, renderer
         const scene = new THREE.Scene();
@@ -91,42 +105,35 @@
                 0.5,
                 (Math.random() - 0.5) * 50
             );
+            enemy.health = 100;
+
+            // Enemy health bar
+            const healthBarGeometry = new THREE.PlaneGeometry(1, 0.1);
+            const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
+            healthBar.position.set(0, 1.2, 0);
+            enemy.add(healthBar);
+
             enemies.push(enemy);
             scene.add(enemy);
         }
         setInterval(spawnEnemy, 3000);
 
-        // Player movement and shooting
-        const keys = {};
-        document.addEventListener('keydown', (e) => keys[e.key] = true);
-        document.addEventListener('keyup', (e) => keys[e.key] = false);
-
+        // Player shooting
         const bullets = [];
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ') shoot();
+        });
+
         function shoot() {
             const bulletGeometry = new THREE.SphereGeometry(0.2);
             const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
             const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
             bullet.position.set(player.position.x, player.position.y, player.position.z);
-            bullet.velocity = new THREE.Vector3(0, 0, -1);
+            bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
             bullets.push(bullet);
             scene.add(bullet);
         }
-        setInterval(shoot, 300);
-
-        // Enemy bullets
-        const enemyBullets = [];
-        function enemyShoot(enemy) {
-            const bulletGeometry = new THREE.SphereGeometry(0.2);
-            const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-            bullet.position.set(enemy.position.x, enemy.position.y, enemy.position.z);
-            bullet.velocity = new THREE.Vector3(0, 0, 1);
-            enemyBullets.push(bullet);
-            scene.add(bullet);
-        }
-        setInterval(() => {
-            enemies.forEach(enemy => enemyShoot(enemy));
-        }, 300);
 
         // Health bar and game over
         const healthBar = document.getElementById('health-bar');
@@ -141,27 +148,58 @@
             }
         }
 
+        // Camera movement with mouse
+        let pointerLocked = false;
+        document.body.addEventListener('click', () => {
+            document.body.requestPointerLock();
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            pointerLocked = !!document.pointerLockElement;
+        });
+
+        let cameraRotation = { x: 0, y: 0 };
+        document.addEventListener('mousemove', (event) => {
+            if (!pointerLocked) return;
+            cameraRotation.y -= event.movementX * 0.002;
+            cameraRotation.x -= event.movementY * 0.002;
+            cameraRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotation.x));
+            camera.rotation.set(cameraRotation.x, cameraRotation.y, 0);
+        });
+
         // Game loop
         let animationId;
         function animate() {
             animationId = requestAnimationFrame(animate);
 
             // Player movement
-            if (keys['w']) player.position.z -= 0.2;
-            if (keys['s']) player.position.z += 0.2;
-            if (keys['a']) player.position.x -= 0.2;
-            if (keys['d']) player.position.x += 0.2;
+            const speed = 0.2;
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            if (keys['w']) player.position.add(forward.clone().multiplyScalar(speed));
+            if (keys['s']) player.position.add(forward.clone().multiplyScalar(-speed));
+            if (keys['a']) player.position.add(right.clone().multiplyScalar(-speed));
+            if (keys['d']) player.position.add(right.clone().multiplyScalar(speed));
 
-            // Update bullets
-            bullets.forEach(bullet => bullet.position.add(bullet.velocity));
-            enemyBullets.forEach(bullet => {
+            // Update bullets and check collisions
+            bullets.forEach((bullet, i) => {
                 bullet.position.add(bullet.velocity);
-                if (bullet.position.distanceTo(player.position) < 1) {
-                    updateHealth(-10);
-                    scene.remove(bullet);
-                    enemyBullets.splice(enemyBullets.indexOf(bullet), 1);
-                }
+                enemies.forEach((enemy, j) => {
+                    if (bullet.position.distanceTo(enemy.position) < 1) {
+                        enemy.health -= 50;
+                        enemy.children[0].scale.x = enemy.health / 100;
+                        scene.remove(bullet);
+                        bullets.splice(i, 1);
+                        if (enemy.health <= 0) {
+                            scene.remove(enemy);
+                            enemies.splice(j, 1);
+                        }
+                    }
+                });
             });
+
+            // Rotate enemies
+            enemies.forEach(enemy => enemy.rotation.y += 0.01);
 
             renderer.render(scene, camera);
         }
