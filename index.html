@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Game with Collisions and Healthbars</title>
+    <title>3D Game with Collisions, Movement, and Enemy AI</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.155.0/three.min.js"></script>
     <style>
         body {
@@ -97,21 +97,35 @@
             const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
             const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
             healthBar.position.set(0, 1.2, 0);
-            healthBar.lookAt(camera.position); // Initial orientation
-            healthBar.material.depthTest = false; // Ensure it always renders on top
+            healthBar.material.depthTest = false; // Always render on top
             enemy.healthBar = healthBar;
             enemy.add(healthBar);
 
             enemies.push(enemy);
             scene.add(enemy);
+
+            // Make enemy shoot
+            setInterval(() => {
+                if (!scene.children.includes(enemy)) return;
+                shootAtPlayer(enemy);
+            }, 1000); // Enemy shoots every second
         }
         setInterval(spawnEnemy, 3000);
 
         // Bullets
         const bullets = [];
-        document.addEventListener('keydown', (e) => {
-            if (e.key === ' ') shoot();
-        });
+        const enemyBullets = [];
+        function shootAtPlayer(enemy) {
+            const bulletGeometry = new THREE.SphereGeometry(0.2);
+            const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+            bullet.position.copy(enemy.position);
+            bullet.velocity = new THREE.Vector3()
+                .subVectors(player.position, enemy.position)
+                .normalize();
+            enemyBullets.push(bullet);
+            scene.add(bullet);
+        }
 
         function shoot() {
             const bulletGeometry = new THREE.SphereGeometry(0.2);
@@ -122,6 +136,14 @@
             bullets.push(bullet);
             scene.add(bullet);
         }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ') shoot();
+        });
+
+        // Player movement
+        const keys = {};
+        document.addEventListener('keydown', (e) => (keys[e.key] = true));
+        document.addEventListener('keyup', (e) => (keys[e.key] = false));
 
         // Camera movement with mouse
         let pointerLocked = false;
@@ -137,8 +159,8 @@
         document.addEventListener('mousemove', (event) => {
             if (!pointerLocked) return;
             const sensitivity = 0.002;
-            cameraRotation.y -= event.movementX * sensitivity;
-            cameraRotation.x -= event.movementY * sensitivity;
+            cameraRotation.y += event.movementX * sensitivity; // Invert X
+            cameraRotation.x += event.movementY * sensitivity; // Invert Y
             cameraRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotation.x));
             camera.rotation.set(cameraRotation.x, cameraRotation.y, 0);
         });
@@ -147,43 +169,39 @@
         function animate() {
             requestAnimationFrame(animate);
 
+            // Player movement
+            const speed = 0.1;
+            if (keys['w']) player.position.z -= Math.cos(cameraRotation.y) * speed;
+            if (keys['s']) player.position.z += Math.cos(cameraRotation.y) * speed;
+            if (keys['a']) player.position.x -= Math.sin(cameraRotation.y) * speed;
+            if (keys['d']) player.position.x += Math.sin(cameraRotation.y) * speed;
+
             // Update bullets
             bullets.forEach((bullet, i) => {
                 bullet.position.add(bullet.velocity.clone().multiplyScalar(0.5));
-
-                // Remove bullets that go out of bounds
                 if (bullet.position.length() > 100) {
                     scene.remove(bullet);
                     bullets.splice(i, 1);
                 }
-
-                // Check collision with enemies
-                enemies.forEach((enemy, j) => {
-                    if (bullet.position.distanceTo(enemy.position) < 1) {
-                        enemy.health -= 50;
-                        enemy.healthBar.scale.x = enemy.health / 100; // Update health bar
-                        scene.remove(bullet);
-                        bullets.splice(i, 1);
-
-                        // Remove enemy if health is depleted
-                        if (enemy.health <= 0) {
-                            scene.remove(enemy);
-                            enemies.splice(j, 1);
-                        }
-                    }
-                });
             });
 
-            // Rotate enemies and update health bars
-            enemies.forEach((enemy) => {
-                enemy.rotation.y += 0.01;
-                if (enemy.healthBar) {
-                    enemy.healthBar.lookAt(camera.position);
+            enemyBullets.forEach((bullet, i) => {
+                bullet.position.add(bullet.velocity.clone().multiplyScalar(0.2));
+                if (bullet.position.distanceTo(player.position) < 1) {
+                    console.log('Player hit!');
+                }
+                if (bullet.position.length() > 100) {
+                    scene.remove(bullet);
+                    enemyBullets.splice(i, 1);
                 }
             });
 
-            // Update camera position
-            camera.position.set(player.position.x, player.position.y + 2, player.position.z);
+            // Enemy behavior
+            enemies.forEach((enemy) => {
+                const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+                enemy.position.add(direction.multiplyScalar(0.05)); // Move toward player
+                enemy.healthBar.lookAt(camera.position); // Face the player
+            });
 
             renderer.render(scene, camera);
         }
