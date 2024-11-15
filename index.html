@@ -1,213 +1,159 @@
-<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D FPS Game</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: black; }
-        canvas { display: block; }
-        #health-bar, #score {
-            position: absolute; color: white; font-size: 20px; padding: 10px;
-        }
-        #health-bar { top: 10px; left: 10px; }
-        #score { top: 40px; left: 10px; }
-    </style>
+  <base href="https://cdn.jsdelivr.net/" />
+  <title>3D Garfield Cube Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+    #instructions { position: absolute; top: 10px; left: 10px; color: white; background: linear-gradient(135deg, #ff6b2b, #ff8c42); padding: 10px; border-radius: 5px; font-family: Arial, sans-serif; }
+    #healthUI { position: absolute; bottom: 20px; left: 20px; background: linear-gradient(135deg, #ff6b2b, #ff8c42); padding: 10px; border-radius: 5px; color: white; font-family: Arial, sans-serif; }
+    #healthBar { width: 200px; height: 20px; background: #ff0000; border-radius: 10px; overflow: hidden; }
+    #healthFill { width: 100%; height: 100%; background: #00ff00; transition: width 0.3s; }
+    .enemyHealthContainer { position: absolute; transform: translate(-50%, -100%); background: linear-gradient(135deg, #ff6b2b, #ff8c42); padding: 5px; border-radius: 5px; color: white; font-family: Arial, sans-serif; pointer-events: none; }
+    .enemyHealthBar { width: 100px; height: 10px; background: #ff0000; border-radius: 5px; overflow: hidden; }
+    .enemyHealthFill { width: 100%; height: 100%; background: #ff0000; transition: width 0.3s; }
+    #crosshair { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 24px; display: none; pointer-events: none; }
+    #playerList { position: absolute; top: 10px; right: 10px; background: linear-gradient(135deg, #ff6b2b, #ff8c42); padding: 10px; border-radius: 5px; color: white; font-family: Arial, sans-serif; min-width: 200px; display: none; }
+    #playerList.active { display: block; }
+    .player-item { margin: 5px 0; display: flex; align-items: center; gap: 10px; }
+  </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="health-bar">Health: 100</div>
-    <div id="score">Score: 0</div>
+  <audio id="backgroundMusic" loop>
+    <source src="/The Garfield Show.mp3" type="audio/mpeg">
+  </audio>
+  <div id="instructions">
+    Use WASD to move<br>
+    Arrow keys to look around<br>
+    Space to jump<br>
+    Press E to shoot fish<br>
+    Avoid enemy fish!
+  </div>
+  <div id="healthUI">Health: <span id="healthText">100</span>
+    <div id="healthBar">
+      <div id="healthFill"></div>
+    </div>
+  </div>
+  <div id="crosshair">+</div>
+  <div id="playerList" class="active">
+    <h3>Online Players</h3>
+    <div id="playerListContent"></div>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/OrbitControls.min.js"></script>
-    <script>
-        let scene, camera, renderer, player, health = 100, score = 0, enemies = [], projectiles = [];
-        let moveSpeed = 0.1, rotateSpeed = 0.02, gravity = -0.005;
-        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-        let crosshair, cursorX = 0, cursorY = 0;
-        let lastTime = 0, deltaTime = 0;
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    const textureLoader = new THREE.TextureLoader();
+    const room = new WebSocket("ws://your-server-url"); // Replace with your WebSocket URL
+    let playerHealth = 100;
+    const gravity = -0.01;
+    const jumpForce = 0.3;
+    let velocity = 0;
+    let isJumping = false;
+    const moveSpeed = 0.1;
+    const scene = new THREE.Scene();
+    const skyGeometry = new THREE.BoxGeometry(1000, 1000, 1000);
+    const skyTexture = textureLoader.load('/clearance.jpg');
+    skyTexture.colorSpace = THREE.SRGBColorSpace;
+    const skyMaterial = new THREE.MeshBasicMaterial({ map: skyTexture, side: THREE.BackSide });
+    const skybox = new THREE.Mesh(skyGeometry, skyMaterial);
+    scene.add(skybox);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    const texture = textureLoader.load('/pngimg.com - garfield_PNG19.png');
+    const fishTexture = textureLoader.load('/fish.png');
+    const enemyTexture = textureLoader.load('/IMG_1349.jpeg');
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshBasicMaterial({ map: texture });
+    const player = new THREE.Mesh(geometry, material);
+    player.userData.direction = new THREE.Vector3(0, 0, -1);
+    scene.add(player);
+    const otherPlayers = new Map();
+    const enemies = [];
+    const numberOfEnemies = 3;
 
-        // Initialize scene
-        function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas') });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+    function createEnemy() {
+      const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+      const enemyMaterial = new THREE.MeshBasicMaterial({ map: enemyTexture });
+      const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+      enemy.position.set(Math.random() * 40 - 20, 0, Math.random() * 40 - 20);
+      enemy.userData.health = 100;
+      scene.add(enemy);
+      enemies.push(enemy);
+      const healthContainer = document.createElement('div');
+      healthContainer.className = 'enemyHealthContainer';
+      healthContainer.innerHTML = ` Health: <span class="enemyHealthText">100</span> <div class="enemyHealthBar"> <div class="enemyHealthFill"></div> </div> `;
+      enemy.userData.healthUI = healthContainer;
+      document.body.appendChild(healthContainer);
+    }
 
-            // Player setup
-            let playerGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
-            let playerMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-            player = new THREE.Mesh(playerGeometry, playerMaterial);
-            player.position.y = 1; // Raise the player off the ground
-            scene.add(player);
+    for (let i = 0; i < numberOfEnemies; i++) {
+      createEnemy();
+    }
 
-            // Set camera position and look
-            camera.position.set(0, 1, 5);
-            camera.rotation.x = 0;
-            camera.rotation.y = 0;
+    const projectiles = [];
+    const enemyProjectiles = [];
+    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22, side: THREE.DoubleSide });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = Math.PI / 2;
+    ground.position.y = -1;
+    scene.add(ground);
+    camera.position.y = 5;
 
-            // Ground
-            let groundGeometry = new THREE.PlaneGeometry(500, 500);
-            let groundMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
-            let ground = new THREE.Mesh(groundGeometry, groundMaterial);
-            ground.rotation.x = Math.PI / -2;
-            scene.add(ground);
+    const keys = {};
+    window.addEventListener('keydown', (event) => { keys[event.key] = true; });
+    window.addEventListener('keyup', (event) => { keys[event.key] = false; });
 
-            // Crosshair
-            crosshair = document.createElement('div');
-            crosshair.style.position = 'absolute';
-            crosshair.style.width = '20px';
-            crosshair.style.height = '20px';
-            crosshair.style.backgroundColor = 'red';
-            crosshair.style.borderRadius = '50%';
-            crosshair.style.top = '50%';
-            crosshair.style.left = '50%';
-            crosshair.style.transform = 'translate(-50%, -50%)';
-            document.body.appendChild(crosshair);
+    function updateHealthUI() {
+      const healthBar = document.getElementById('healthBar');
+      const healthFill = document.getElementById('healthFill');
+      healthFill.style.width = `${playerHealth}%`;
+      document.getElementById('healthText').innerText = `${playerHealth}`;
+    }
 
-            // Event listeners for mouse and keyboard
-            window.addEventListener('keydown', onKeyDown);
-            window.addEventListener('keyup', onKeyUp);
-            window.addEventListener('mousemove', onMouseMove);
-            window.addEventListener('mousedown', onMouseDown);
-            window.addEventListener('resize', onResize);
-
-            // Spawn enemies
-            spawnEnemy();
-
-            // Start the game loop
-            gameLoop();
+    function handlePlayerMovement() {
+      if (keys['ArrowLeft']) player.rotation.y += 0.05;
+      if (keys['ArrowRight']) player.rotation.y -= 0.05;
+      if (keys['ArrowUp']) player.position.z -= moveSpeed;
+      if (keys['ArrowDown']) player.position.z += moveSpeed;
+      if (keys['w']) player.position.x += moveSpeed;
+      if (keys['s']) player.position.x -= moveSpeed;
+      if (keys[' ']) {
+        if (!isJumping) {
+          isJumping = true;
+          velocity = jumpForce;
         }
+      }
+    }
 
-        // Game loop
-        function gameLoop() {
-            requestAnimationFrame(gameLoop);
-            deltaTime = (performance.now() - lastTime) / 1000;
-            lastTime = performance.now();
-
-            // Update player movement
-            updatePlayerMovement();
-
-            // Check for collisions (projectiles and enemies)
-            checkCollisions();
-
-            // Update projectiles
-            updateProjectiles();
-
-            // Render the scene
-            renderer.render(scene, camera);
+    function animate() {
+      requestAnimationFrame(animate);
+      handlePlayerMovement();
+      if (isJumping) {
+        player.position.y += velocity;
+        velocity += gravity;
+        if (player.position.y <= 0) {
+          player.position.y = 0;
+          isJumping = false;
         }
-
-        // Update player movement based on WASD keys
-        function updatePlayerMovement() {
-            let velocity = new THREE.Vector3();
-
-            if (moveForward) velocity.z -= moveSpeed;
-            if (moveBackward) velocity.z += moveSpeed;
-            if (moveLeft) velocity.x -= moveSpeed;
-            if (moveRight) velocity.x += moveSpeed;
-
-            player.position.add(velocity);
-            camera.position.set(player.position.x, player.position.y + 1, player.position.z + 5);
-            camera.lookAt(player.position);
-
-            // Camera control (pitch and yaw)
-            camera.rotation.x = cursorY * rotateSpeed;
-            camera.rotation.y = cursorX * rotateSpeed;
+      }
+      for (const enemy of enemies) {
+        if (enemy.userData.health <= 0) {
+          scene.remove(enemy);
+          enemies.splice(enemies.indexOf(enemy), 1);
+        } else {
+          const enemyHealthUI = enemy.userData.healthUI;
+          const healthBar = enemyHealthUI.querySelector('.enemyHealthBar');
+          const healthFill = enemyHealthUI.querySelector('.enemyHealthFill');
+          healthFill.style.width = `${(enemy.userData.health / 100) * 100}%`;
         }
+      }
+      renderer.render(scene, camera);
+    }
 
-        // Handle key presses for movement
-        function onKeyDown(event) {
-            switch (event.key) {
-                case 'w': moveForward = true; break;
-                case 's': moveBackward = true; break;
-                case 'a': moveLeft = true; break;
-                case 'd': moveRight = true; break;
-            }
-        }
-
-        function onKeyUp(event) {
-            switch (event.key) {
-                case 'w': moveForward = false; break;
-                case 's': moveBackward = false; break;
-                case 'a': moveLeft = false; break;
-                case 'd': moveRight = false; break;
-            }
-        }
-
-        // Mouse movement for camera control
-        function onMouseMove(event) {
-            cursorX = (event.clientX / window.innerWidth) * 2 - 1;
-            cursorY = -(event.clientY / window.innerHeight) * 2 + 1;
-        }
-
-        // Shoot projectiles
-        function onMouseDown() {
-            let projectileGeometry = new THREE.SphereGeometry(0.1, 32, 32);
-            let projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-            let projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            projectile.position.set(player.position.x, player.position.y + 1, player.position.z);
-            scene.add(projectile);
-            projectiles.push(projectile);
-
-            // Move the projectile forward
-            function moveProjectile() {
-                projectile.position.z -= 0.5;
-                if (projectile.position.z < -50) {
-                    scene.remove(projectile);
-                    projectiles.splice(projectiles.indexOf(projectile), 1);
-                }
-            }
-
-            moveProjectile();
-        }
-
-        // Spawn enemies at random locations
-        function spawnEnemy() {
-            let enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-            let enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-            let enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-            enemy.position.set(Math.random() * 50 - 25, 0.5, Math.random() * 50 - 25);
-            scene.add(enemy);
-            enemies.push(enemy);
-        }
-
-        // Check for collisions between projectiles and enemies
-        function checkCollisions() {
-            projectiles.forEach((projectile, index) => {
-                enemies.forEach((enemy, enemyIndex) => {
-                    if (projectile.position.distanceTo(enemy.position) < 1) {
-                        score += 10;
-                        document.getElementById('score').innerText = `Score: ${score}`;
-                        scene.remove(enemy);
-                        enemies.splice(enemyIndex, 1);
-                    }
-                });
-            });
-        }
-
-        // Update projectiles and remove when off-screen
-        function updateProjectiles() {
-            projectiles.forEach((projectile) => {
-                projectile.position.z -= 0.5;
-                if (projectile.position.z < -50) {
-                    scene.remove(projectile);
-                    projectiles.splice(projectiles.indexOf(projectile), 1);
-                }
-            });
-        }
-
-        // Resize event
-        function onResize() {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-        }
-
-        // Initialize the game
-        init();
-    </script>
+    animate();
+  </script>
 </body>
 </html>
