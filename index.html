@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Cube Game with Respawn and Enemy Health</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+
+        /* Health bar styles */
+        #health-bar-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 300px;
+            height: 30px;
+            background-color: #ccc;
+            border-radius: 5px;
+        }
+
+        #health-bar {
+            height: 100%;
+            background-color: #00ff00;
+            width: 100%; /* Start at 100% health */
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Health Bar UI -->
+    <div id="health-bar-container">
+        <div id="health-bar"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Player setup (cube)
+        const geometry = new THREE.BoxGeometry();
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+
+        // Gun setup (using a PNG image as the texture)
+        const gunTexture = new THREE.TextureLoader().load('https://example.com/your-gun-image.png'); // Replace with actual image URL
+        const gunGeometry = new THREE.PlaneGeometry(1, 0.5); // Plane for the gun
+        const gunMaterial = new THREE.MeshBasicMaterial({ map: gunTexture, transparent: true });
+        const gun = new THREE.Mesh(gunGeometry, gunMaterial);
+        gun.position.set(0, 0.5, 1); // Attach it to the front of the cube (player)
+        gun.rotation.x = Math.PI / 2; // Rotate the gun to align it properly
+        cube.add(gun); // Make the gun part of the cube
+
+        // Enemy setup (cube)
+        const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+        enemy.position.set(5, 0.5, 0); // Place the enemy at some distance from the player
+        scene.add(enemy);
+
+        // Enemy health setup
+        let enemyHealth = 100; // Enemy's initial health
+        const maxEnemyHealth = 100; // Maximum enemy health
+
+        // Text to display enemy health above the enemy
+        const loader = new THREE.FontLoader();
+        let enemyHealthText = null;
+
+        // Load font and create text for enemy health display
+        loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+            const textGeometry = new THREE.TextGeometry(`Health: ${enemyHealth}`, {
+                font: font,
+                size: 0.3,
+                height: 0.1
+            });
+            const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            enemyHealthText = new THREE.Mesh(textGeometry, textMaterial);
+            enemyHealthText.position.set(enemy.position.x, enemy.position.y + 1, enemy.position.z); // Place it above the enemy
+            scene.add(enemyHealthText);
+        });
+
+        // Fish bullet setup
+        const fishTexture = new THREE.TextureLoader().load('https://example.com/your-fish-image.png'); // Replace with actual fish image
+        const fishBulletGeometry = new THREE.CircleGeometry(0.2, 32); // Use a circle for the fish bullet
+        const fishBulletMaterial = new THREE.MeshBasicMaterial({ map: fishTexture, transparent: true });
+        const fishBullets = [];
+
+        // Camera position
+        camera.position.z = 5;
+
+        // Cube (player) movement variables
+        const speed = 0.1;
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+
+        // Player health setup
+        let health = 100; // Player's initial health
+        const maxHealth = 100; // Maximum health
+
+        // Event listeners for keypresses
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowUp') moveForward = true;
+            if (event.key === 'ArrowDown') moveBackward = true;
+            if (event.key === 'ArrowLeft') moveLeft = true;
+            if (event.key === 'ArrowRight') moveRight = true;
+            if (event.key === ' ') shootBullet(); // Spacebar to shoot
+        });
+
+        window.addEventListener('keyup', (event) => {
+            if (event.key === 'ArrowUp') moveForward = false;
+            if (event.key === 'ArrowDown') moveBackward = false;
+            if (event.key === 'ArrowLeft') moveLeft = false;
+            if (event.key === 'ArrowRight') moveRight = false;
+        });
+
+        // Function to shoot player's bullets
+        function shootBullet() {
+            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+            bullet.position.set(cube.position.x, cube.position.y + 0.5, cube.position.z); // Position it in front of the gun
+            bullet.velocity = new THREE.Vector3(0, 0, -1); // Bullet moves forward along the z-axis
+
+            // Calculate the direction of the bullet based on the gun's position and rotation
+            const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(cube.matrixWorld).normalize();
+            bullet.velocity.copy(direction);
+
+            scene.add(bullet);
+            bullets.push(bullet);
+        }
+
+        // Function to shoot enemy fish bullets
+        function shootFishBullet() {
+            const fishBullet = new THREE.Mesh(fishBulletGeometry, fishBulletMaterial);
+            fishBullet.position.set(enemy.position.x, enemy.position.y + 0.5, enemy.position.z); // Position it in front of the enemy
+            fishBullet.velocity = new THREE.Vector3(0, 0, -1); // Fish bullet moves forward along the z-axis
+
+            // Calculate the direction of the fish bullet based on the enemy's position and the player's position
+            const direction = new THREE.Vector3(cube.position.x - enemy.position.x, cube.position.y - enemy.position.y, cube.position.z - enemy.position.z).normalize();
+            fishBullet.velocity.copy(direction);
+
+            scene.add(fishBullet);
+            fishBullets.push(fishBullet);
+        }
+
+        // Cube movement logic
+        function moveCube() {
+            if (moveForward) cube.position.z -= speed;
+            if (moveBackward) cube.position.z += speed;
+            if (moveLeft) cube.position.x -= speed;
+            if (moveRight) cube.position.x += speed;
+        }
+
+        // Enemy look-at player logic
+        function lookAtPlayer() {
+            const direction = new THREE.Vector3(cube.position.x - enemy.position.x, cube.position.y - enemy.position.y, cube.position.z - enemy.position.z);
+            enemy.lookAt(enemy.position.clone().add(direction)); // Make the enemy look at the player
+        }
+
+        // Bullet movement logic
+        function moveBullets() {
+            for (let i = 0; i < bullets.length; i++) {
+                bullets[i].position.add(bullets[i].velocity.clone().multiplyScalar(0.2)); // Move the bullet forward
+
+                // Remove bullets that go out of view
+                if (bullets[i].position.z < -10) {
+                    scene.remove(bullets[i]);
+                    bullets.splice(i, 1);
+                    i--;
+                }
+            }
+
+            for (let i = 0; i < fishBullets.length; i++) {
+                fishBullets[i].position.add(fishBullets[i].velocity.clone().multiplyScalar(0.2)); // Move the fish bullet forward
+
+                // Remove fish bullets that go out of view
+                if (fishBullets[i].position.z < -10) {
+                    scene.remove(fishBullets[i]);
+                    fishBullets.splice(i, 1);
+                    i--;
+                }
+
+                // Check for collision with the player
+                if (fishBullets[i].position.distanceTo(cube.position) < 1) {
+                    health -= 10; // Decrease player health by 10
+                    scene.remove(fishBullets[i]); // Remove fish bullet on collision
+                    fishBullets.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        // Bullet collision with the enemy
+        function checkBulletCollision() {
+            for (let i = 0; i < bullets.length; i++) {
+                if (bullets[i].position.distanceTo(enemy.position) < 1) {
+                    enemyHealth -= 10; // Decrease enemy health
+                    scene.remove(bullets[i]); // Remove bullet on collision
+                    bullets.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+
+        // Update the health display for the enemy
+        function updateEnemyHealthUI() {
+            if (enemyHealthText) {
+                enemyHealthText.geometry.dispose(); // Dispose the old geometry
+                const textGeometry = new THREE.TextGeometry(`Health: ${enemyHealth}`, {
+                    font: loader.parse('helvetiker_regular'),
+                    size: 0.3,
+                    height: 0.1
+                });
+                enemyHealthText.geometry = textGeometry; // Update the text geometry with new health
+                enemyHealthText.position.set(enemy.position.x, enemy.position.y + 1, enemy.position.z); // Update position
+            }
+        }
+
+        // Respawn the player when health reaches 0
+        function respawn() {
+            health = maxHealth;
+            cube.position.set(0, 0.5, 5); // Respawn position
+            bullets.forEach(bullet => scene.remove(bullet)); // Remove all bullets
+            bullets = [];
+        }
+
+        // Update player health bar UI
+        function updateHealthBar() {
+            const healthBar = document.getElementById('health-bar');
+            healthBar.style.width = `${(health / maxHealth) * 100}%`;
+        }
+
+        // Main animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            moveCube(); // Move the cube
+            lookAtPlayer(); // Make enemy look at player
+            moveBullets(); // Move bullets
+            checkBulletCollision(); // Check if bullets hit the enemy
+            updateEnemyHealthUI(); // Update enemy health UI
+            updateHealthBar(); // Update player health UI
+
+            // Respawn player if health is 0
+            if (health <= 0) respawn();
+
+            renderer.render(scene, camera);
+        }
+
+        animate(); // Start the animation loop
+    </script>
+</body>
+</html>
