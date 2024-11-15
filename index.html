@@ -33,7 +33,7 @@
         <div id="health-bar"></div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         // Scene setup
         const scene = new THREE.Scene();
@@ -123,7 +123,7 @@
 
         // Function to shoot player's bullets
         function shootBullet() {
-            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+            const bullet = new THREE.Mesh(fishBulletGeometry, fishBulletMaterial);
             bullet.position.set(cube.position.x, cube.position.y + 0.5, cube.position.z); // Position it in front of the gun
             bullet.velocity = new THREE.Vector3(0, 0, -1); // Bullet moves forward along the z-axis
 
@@ -132,7 +132,7 @@
             bullet.velocity.copy(direction);
 
             scene.add(bullet);
-            bullets.push(bullet);
+            fishBullets.push(bullet);
         }
 
         // Function to shoot enemy fish bullets
@@ -165,17 +165,6 @@
 
         // Bullet movement logic
         function moveBullets() {
-            for (let i = 0; i < bullets.length; i++) {
-                bullets[i].position.add(bullets[i].velocity.clone().multiplyScalar(0.2)); // Move the bullet forward
-
-                // Remove bullets that go out of view
-                if (bullets[i].position.z < -10) {
-                    scene.remove(bullets[i]);
-                    bullets.splice(i, 1);
-                    i--;
-                }
-            }
-
             for (let i = 0; i < fishBullets.length; i++) {
                 fishBullets[i].position.add(fishBullets[i].velocity.clone().multiplyScalar(0.2)); // Move the fish bullet forward
 
@@ -198,20 +187,19 @@
 
         // Bullet collision with the enemy
         function checkBulletCollision() {
-            for (let i = 0; i < bullets.length; i++) {
-                if (bullets[i].position.distanceTo(enemy.position) < 1) {
+            for (let i = 0; i < fishBullets.length; i++) {
+                if (fishBullets[i].position.distanceTo(enemy.position) < 1) {
                     enemyHealth -= 10; // Decrease enemy health
-                    scene.remove(bullets[i]); // Remove bullet on collision
-                    bullets.splice(i, 1);
+                    scene.remove(fishBullets[i]); // Remove fish bullet on collision
+                    fishBullets.splice(i, 1);
                     i--;
                 }
             }
         }
 
-        // Update the health display for the enemy
+        // Update enemy health UI
         function updateEnemyHealthUI() {
             if (enemyHealthText) {
-                enemyHealthText.geometry.dispose(); // Dispose the old geometry
                 const textGeometry = new THREE.TextGeometry(`Health: ${enemyHealth}`, {
                     font: loader.parse('helvetiker_regular'),
                     size: 0.3,
@@ -222,12 +210,12 @@
             }
         }
 
-        // Respawn the player when health reaches 0
+        // Respawn player when health reaches 0
         function respawn() {
             health = maxHealth;
             cube.position.set(0, 0.5, 5); // Respawn position
-            bullets.forEach(bullet => scene.remove(bullet)); // Remove all bullets
-            bullets = [];
+            fishBullets.forEach(bullet => scene.remove(bullet)); // Remove all bullets
+            fishBullets.length = 0;
         }
 
         // Update player health bar UI
@@ -240,14 +228,14 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            moveCube(); // Move the cube
+            moveCube(); // Move the player cube
             lookAtPlayer(); // Make enemy look at player
-            moveBullets(); // Move bullets
+            moveBullets(); // Move fish bullets
             checkBulletCollision(); // Check if bullets hit the enemy
             updateEnemyHealthUI(); // Update enemy health UI
             updateHealthBar(); // Update player health UI
 
-            // Respawn player if health is 0
+            // Respawn player if health reaches 0
             if (health <= 0) respawn();
 
             renderer.render(scene, camera);
