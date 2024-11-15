@@ -50,6 +50,10 @@
             if (event.key === 'ArrowRight') moveRight = false;
         });
 
+        // Disable mouse control (if enabled by default in any other part of the script)
+        // This part is not required for this basic script, but would be if mouse controls were added.
+        document.body.style.cursor = 'default';
+
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
