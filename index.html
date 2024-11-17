@@ -41,16 +41,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r110/examples/js/loaders/GLTFLoader.js"></script>
   <script>
-    // Basic setup for main scene (game world)
+    // Main scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
-
-    // HUD elements
-    const playerHealthElement = document.getElementById("playerHealth");
-    const scoreElement = document.getElementById("score");
 
     // Gun scene setup
     const gunCanvas = document.getElementById('gunCanvas');
@@ -59,7 +55,7 @@
     const gunScene = new THREE.Scene();
     const gunCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000); // Adjusted to 1:1 aspect ratio for gun
 
-    // Load the gun model into the second scene
+    // Load gun model
     const loader = new THREE.GLTFLoader();
     loader.load('scene.gltf', (gltf) => {
       const gun = gltf.scene;
@@ -69,7 +65,7 @@
       gunCamera.position.set(0, 0, 5); // Position the gun in view for the mini camera
     });
 
-    // Camera and movement handling for the main game world (first scene)
+    // Camera and movement handling for the main game world
     const keys = {};
     let isJumping = false;
     let velocityY = 0;
@@ -115,7 +111,7 @@
       camera.position.copy(newPosition);
     }
 
-    // Skybox setup with a single image (adjust as needed)
+    // Skybox setup
     const skyTexture = new THREE.TextureLoader().load('sky.jpg');
     skyTexture.mapping = THREE.EquirectangularRefractionMapping;
     scene.background = skyTexture;
