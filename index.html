@@ -28,7 +28,7 @@
 </head>
 <body>
   <div id="crosshair"></div>
-  <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span> | Level: <span id="level">1</span></div>
+  <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
   <script>
     // Basic setup
@@ -41,12 +41,10 @@
     // HUD elements
     const playerHealthElement = document.getElementById("playerHealth");
     const scoreElement = document.getElementById("score");
-    const levelElement = document.getElementById("level");
 
     // Player properties
     let playerHealth = 100;
     let score = 0;
-    let level = 1;
 
     // Movement controls
     const keys = {};
@@ -60,6 +58,7 @@
     const playerSpeed = 0.1;
     const jumpSpeed = 0.3;
 
+    // Handle player movement
     function handlePlayerMovement() {
       const forward = new THREE.Vector3();
       const right = new THREE.Vector3();
@@ -113,25 +112,25 @@
       if (document.pointerLockElement === document.body) {
         yaw -= event.movementX * 0.002;
         pitch -= event.movementY * 0.002;
-        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
-        camera.rotation.set(pitch, yaw, 0);
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch)); // Clamp vertical rotation
+        camera.rotation.set(pitch, yaw, 0); // Apply pitch and yaw
       }
     });
 
-    // Skybox setup
-    const loader = new THREE.CubeTextureLoader();
-    const skyboxTexture = loader.load([
-      './textures/garfield_px.png',
-      './textures/garfield_nx.png',
-      './textures/garfield_py.png',
-      './textures/garfield_ny.png',
-      './textures/garfield_pz.png',
-      './textures/garfield_nz.png',
-    ]);
-    scene.background = skyboxTexture;
+    // Skybox setup (single image as sky texture)
+    const texture = new THREE.TextureLoader().load('sky.jpg'); // Replace with your sky image
+    scene.background = texture;
 
-    // Add boxes around the map
-    const boxTexture = new THREE.TextureLoader().load('garfield.png');
+    // Add green floor
+    const floorGeometry = new THREE.PlaneGeometry(200, 200);
+    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = - Math.PI / 2;
+    scene.add(floor);
+
+    // Box setup
+    const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your box image
+    const boxes = [];
     for (let i = 0; i < 10; i++) {
       const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
@@ -142,6 +141,19 @@
         Math.random() * 80 - 40
       );
       scene.add(box);
+      boxes.push(box);
+    }
+
+    // Detect collisions with boxes
+    function checkCollisions() {
+      const playerBox = new THREE.Box3().setFromObject(camera);
+      boxes.forEach((box) => {
+        const boxBoundingBox = new THREE.Box3().setFromObject(box);
+        if (playerBox.intersectsBox(boxBoundingBox)) {
+          // Collision detected, stop player movement in that direction
+          camera.position.sub(camera.position.clone().sub(box.position).multiplyScalar(0.1));
+        }
+      });
     }
 
     // Enemy management
@@ -216,9 +228,7 @@
               scene.remove(enemy);
               enemies.splice(enemyIndex, 1);
               score += 10;
-              if (score % 50 === 0) level++; // Increase level every 50 points
               scoreElement.textContent = score;
-              levelElement.textContent = level;
             }
             scene.remove(bullet);
             bullets.splice(index, 1);
@@ -231,6 +241,7 @@
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
+      checkCollisions(); // Check collisions with boxes
       updateEnemies();
       updateBullets();
       renderer.render(scene, camera);
