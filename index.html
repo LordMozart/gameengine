@@ -58,6 +58,9 @@
     const playerSpeed = 0.1;
     const jumpSpeed = 0.3;
 
+    // Camera height (now doubled)
+    const cameraHeight = 2;  // Changed from 1 to 2 for 200px equivalent height
+
     // Handle player movement
     function handlePlayerMovement() {
       const forward = new THREE.Vector3();
@@ -96,15 +99,15 @@
         }
       });
 
-      if (newPosition.y < 1) {
-        newPosition.y = 1;
+      if (newPosition.y < cameraHeight) {
+        newPosition.y = cameraHeight;
         velocityY = 0;
         isJumping = false;
       }
 
       // Keep player within boundaries
       newPosition.clamp(
-        new THREE.Vector3(-50, 1, -50),
+        new THREE.Vector3(-50, cameraHeight, -50),
         new THREE.Vector3(50, 10, 50)
       );
 
