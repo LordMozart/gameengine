@@ -1,114 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Cube Game with Gun</title>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D FPS Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 10px;
+      height: 10px;
+      background: red;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+    }
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+  </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        // Scene setup
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+  <div id="crosshair"></div>
+  <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+  <script>
+    // Basic setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-        // Cube setup (player)
-        const geometry = new THREE.BoxGeometry();
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        const cube = new THREE.Mesh(geometry, material);
-        scene.add(cube);
+    // HUD elements
+    const playerHealthElement = document.getElementById("playerHealth");
+    const scoreElement = document.getElementById("score");
 
-        // Gun setup (using a PNG image as the texture)
-        const gunTexture = new THREE.TextureLoader().load('https://example.com/your-gun-image.png'); // Replace with actual image URL
-        const gunGeometry = new THREE.PlaneGeometry(1, 0.5); // Plane for the gun
-        const gunMaterial = new THREE.MeshBasicMaterial({ map: gunTexture, transparent: true });
-        const gun = new THREE.Mesh(gunGeometry, gunMaterial);
-        gun.position.set(0, 0.5, 0); // Attach it to the top of the cube (player)
-        gun.rotation.x = Math.PI / 2; // Rotate the gun to align it properly
-        cube.add(gun); // Make the gun part of the cube
+    // Player properties
+    let playerHealth = 100;
+    let score = 0;
 
-        // Camera position
-        camera.position.z = 5;
+    // Pointer lock for mouse control
+    document.body.addEventListener('click', () => {
+      document.body.requestPointerLock();
+    });
 
-        // Cube movement variables
-        const speed = 0.1;
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
+    let mouseX = 0, mouseY = 0;
+    document.addEventListener('mousemove', (event) => {
+      if (document.pointerLockElement === document.body) {
+        mouseX += event.movementX * 0.002;
+        mouseY += event.movementY * 0.002;
+        camera.rotation.y = -mouseX;
+        camera.rotation.x = -mouseY;
+      }
+    });
 
-        // Bullet setup (using PNG image for the projectile)
-        const bulletTexture = new THREE.TextureLoader().load('https://example.com/your-bullet-image.png'); // Replace with actual bullet image
-        const bulletGeometry = new THREE.CircleGeometry(0.1, 32); // Use a circle for the bullet
-        const bulletMaterial = new THREE.MeshBasicMaterial({ map: bulletTexture, transparent: true });
-        const bullets = [];
+    // Player movement
+    const keys = {};
+    document.addEventListener('keydown', (e) => keys[e.key] = true);
+    document.addEventListener('keyup', (e) => keys[e.key] = false);
 
-        // Event listeners for keypresses
-        window.addEventListener('keydown', (event) => {
-            if (event.key === 'ArrowUp') moveForward = true;
-            if (event.key === 'ArrowDown') moveBackward = true;
-            if (event.key === 'ArrowLeft') moveLeft = true;
-            if (event.key === 'ArrowRight') moveRight = true;
-            if (event.key === ' ') shootBullet(); // Spacebar to shoot
-        });
+    const playerSpeed = 0.1;
 
-        window.addEventListener('keyup', (event) => {
-            if (event.key === 'ArrowUp') moveForward = false;
-            if (event.key === 'ArrowDown') moveBackward = false;
-            if (event.key === 'ArrowLeft') moveLeft = false;
-            if (event.key === 'ArrowRight') moveRight = false;
-        });
+    function handlePlayerMovement() {
+      const forward = new THREE.Vector3();
+      const right = new THREE.Vector3();
 
-        // Function to shoot bullets
-        function shootBullet() {
-            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-            bullet.position.set(cube.position.x, cube.position.y + 0.5, cube.position.z); // Position it in front of the gun
-            scene.add(bullet);
-            bullets.push(bullet);
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+
+      right.crossVectors(camera.up, forward).normalize();
+
+      if (keys['w']) camera.position.addScaledVector(forward, playerSpeed);
+      if (keys['s']) camera.position.addScaledVector(forward, -playerSpeed);
+      if (keys['a']) camera.position.addScaledVector(right, -playerSpeed);
+      if (keys['d']) camera.position.addScaledVector(right, playerSpeed);
+    }
+
+    // Environment setup
+    const floorGeometry = new THREE.PlaneGeometry(100, 100);
+    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // Enemy management
+    const enemies = [];
+    const enemySpeed = 0.05;
+
+    function spawnEnemy() {
+      const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+      const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+      enemy.position.set(Math.random() * 20 - 10, 1, Math.random() * 20 - 10);
+      enemy.health = 50;
+      enemies.push(enemy);
+      scene.add(enemy);
+    }
+
+    setInterval(spawnEnemy, 3000); // Spawn an enemy every 3 seconds
+
+    function updateEnemies() {
+      enemies.forEach((enemy, index) => {
+        const direction = new THREE.Vector3();
+        direction.subVectors(camera.position, enemy.position).normalize();
+        enemy.position.addScaledVector(direction, enemySpeed);
+
+        // Check if close enough to "attack" player
+        if (enemy.position.distanceTo(camera.position) < 1) {
+          playerHealth -= 10;
+          playerHealthElement.textContent = playerHealth;
+          if (playerHealth <= 0) alert("Game Over!");
+          scene.remove(enemy);
+          enemies.splice(index, 1);
         }
+      });
+    }
 
-        // Cube movement logic
-        function moveCube() {
-            if (moveForward) cube.position.z -= speed;
-            if (moveBackward) cube.position.z += speed;
-            if (moveLeft) cube.position.x -= speed;
-            if (moveRight) cube.position.x += speed;
-        }
+    // Player shooting
+    document.addEventListener('click', () => {
+      const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+      bullet.position.copy(camera.position);
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      bullet.velocity = direction.multiplyScalar(0.2);
+      scene.add(bullet);
 
-        // Bullet movement logic
-        function moveBullets() {
-            for (let i = 0; i < bullets.length; i++) {
-                bullets[i].position.z -= 0.2; // Move bullets forward
-                if (bullets[i].position.z < -5) {
-                    scene.remove(bullets[i]);
-                    bullets.splice(i, 1);
-                    i--;
-                }
+      const interval = setInterval(() => {
+        bullet.position.add(bullet.velocity);
+        enemies.forEach((enemy, index) => {
+          if (bullet.position.distanceTo(enemy.position) < 1) {
+            enemy.health -= 25;
+            if (enemy.health <= 0) {
+              scene.remove(enemy);
+              enemies.splice(index, 1);
+              score += 10;
+              scoreElement.textContent = score;
             }
-        }
+            scene.remove(bullet);
+            clearInterval(interval);
+          }
+        });
+      }, 16);
+    });
 
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
+    // Game Loop
+    function animate() {
+      requestAnimationFrame(animate);
+      handlePlayerMovement();
+      updateEnemies();
+      renderer.render(scene, camera);
+    }
 
-            // Move the player (cube)
-            moveCube();
-
-            // Move bullets
-            moveBullets();
-
-            // Render the scene
-            renderer.render(scene, camera);
-        }
-
-        animate();
-    </script>
+    animate();
+  </script>
 </body>
 </html>
