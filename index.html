@@ -116,8 +116,8 @@
       }
     });
 
-    // Skybox setup with single image
-    const skyTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your panoramic image
+    // Skybox setup with single image (garfield.png)
+    const skyTexture = new THREE.TextureLoader().load('garfield.png'); // Skybox image located in the same folder
     skyTexture.mapping = THREE.EquirectangularRefractionMapping;
     scene.background = skyTexture;
 
@@ -129,7 +129,7 @@
     scene.add(floor);
 
     // Box setup
-    const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your box image
+    const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Box texture located in the same folder
     const boxes = [];
     for (let i = 0; i < 10; i++) {
       const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
@@ -242,11 +242,11 @@
       });
     }
 
-    // Gun Model (GLTF)
+    // Gun Model (GLTF) - Use scene.gltf
     const gunGroup = new THREE.Group();
     const loader = new THREE.GLTFLoader();
 
-    loader.load('models/gun_model.gltf', (gltf) => {
+    loader.load('scene.gltf', (gltf) => { // Gun model located in the same folder
       const gun = gltf.scene;
       gun.scale.set(0.5, 0.5, 0.5); // Adjust size if needed
       gun.position.set(1.5, -0.5, -3);
