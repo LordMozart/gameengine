@@ -108,7 +108,7 @@
     scene.background = skyboxTexture;
 
     // Add boxes around the map
-    const boxTexture = new THREE.TextureLoader().load('./textures/box_texture.png');
+    const boxTexture = new THREE.TextureLoader().load('garfield.png');
     for (let i = 0; i < 10; i++) {
       const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
