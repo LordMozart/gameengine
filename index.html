@@ -124,10 +124,9 @@
       }
     });
 
-    // Skybox setup with single image
-    const skyTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your panoramic image
-    skyTexture.mapping = THREE.EquirectangularRefractionMapping;
-    scene.background = skyTexture;
+    // Set Garfield texture as the background instead of skybox
+    const garfieldTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with the image path
+    scene.background = garfieldTexture;
 
     // Add ground texture
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
@@ -152,6 +151,42 @@
       );
       scene.add(box);
       parkourBoxes.push(box);
+    }
+
+    // Enemy management
+    const enemies = [];
+    const enemySpeed = 0.05;
+
+    function spawnEnemy() {
+      const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+      const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+      enemy.position.set(
+        Math.random() * 40 - 20,
+        1,
+        Math.random() * 40 - 20
+      );
+      enemy.health = 50;
+      enemies.push(enemy);
+      scene.add(enemy);
+    }
+
+    setInterval(spawnEnemy, 3000); // Spawn an enemy every 3 seconds
+
+    function updateEnemies() {
+      enemies.forEach((enemy, index) => {
+        const direction = new THREE.Vector3();
+        direction.subVectors(camera.position, enemy.position).normalize();
+        enemy.position.addScaledVector(direction, enemySpeed);
+
+        if (enemy.position.distanceTo(camera.position) < 1) {
+          playerHealth -= 10;
+          playerHealthElement.textContent = playerHealth;
+          if (playerHealth <= 0) alert("Game Over!");
+          scene.remove(enemy);
+          enemies.splice(index, 1);
+        }
+      });
     }
 
     // Bullet management
@@ -202,6 +237,7 @@
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
+      updateEnemies();
       updateBullets();
       renderer.render(scene, camera);
     }
