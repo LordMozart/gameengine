@@ -13,7 +13,7 @@
       left: 50%;
       width: 10px;
       height: 10px;
-      background: white;
+      background: red;
       transform: translate(-50%, -50%);
       border-radius: 50%;
     }
@@ -31,93 +31,104 @@
   <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
   <script>
-    // Basic setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // HUD elements
     const playerHealthElement = document.getElementById("playerHealth");
     const scoreElement = document.getElementById("score");
 
-    // Player properties
     let playerHealth = 100;
     let score = 0;
 
-    // Movement controls
+    // Movement control
     const keys = {};
     let isJumping = false;
     let velocityY = 0;
     const gravity = -0.01;
+    const playerSpeed = 0.1;
+    const jumpSpeed = 0.3;
 
     document.addEventListener('keydown', (e) => keys[e.key] = true);
     document.addEventListener('keyup', (e) => keys[e.key] = false);
 
-    const playerSpeed = 0.1;
-    const jumpSpeed = 0.3;
+    function handlePlayerMovement() {
+      const forward = new THREE.Vector3();
+      const right = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+      right.crossVectors(forward, camera.up).normalize();
 
-    // Camera height (doubled)
-    const cameraHeight = 2;  // Changed from 1 to 2 for 200px equivalent height
-    camera.position.y = cameraHeight; // Set camera to start at the new height
+      const newPosition = camera.position.clone();
+      if (keys['w']) newPosition.addScaledVector(forward, playerSpeed);
+      if (keys['s']) newPosition.addScaledVector(forward, -playerSpeed);
+      if (keys['a']) newPosition.addScaledVector(right, -playerSpeed);
+      if (keys['d']) newPosition.addScaledVector(right, playerSpeed);
 
-    // Mouse movement to move the camera up and down (within limits)
-    let verticalMovement = 0;
-    let mouseYSpeed = 0.002; // Sensitivity for mouse movement
+      // Jumping
+      if (keys[' '] && !isJumping) {
+        isJumping = true;
+        velocityY = jumpSpeed;
+      }
 
+      velocityY += gravity;
+      newPosition.y += velocityY;
+
+      if (newPosition.y < 1) {
+        newPosition.y = 1;
+        velocityY = 0;
+        isJumping = false;
+      }
+
+      newPosition.clamp(
+        new THREE.Vector3(-50, 1, -50),
+        new THREE.Vector3(50, 10, 50)
+      );
+
+      camera.position.copy(newPosition);
+    }
+
+    document.body.addEventListener('click', () => {
+      document.body.requestPointerLock();
+    });
+
+    let yaw = 0;
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
-        // Adjust yaw based on mouse movement for left/right rotation
         yaw -= event.movementX * 0.002;
-        camera.rotation.set(verticalMovement, yaw, 0);
-
-        // Adjust vertical camera position with mouse Y (up/down)
-        verticalMovement += event.movementY * mouseYSpeed;
-        verticalMovement = Math.max(-1.5, Math.min(1.5, verticalMovement)); // Restrict to vertical limits
-        camera.position.y = cameraHeight + verticalMovement;
+        camera.rotation.set(0, yaw, 0);
       }
     });
 
-    // Floor setup with texture
+    // Skybox
+    const skyTexture = new THREE.TextureLoader().load('sky.jpg');
+    skyTexture.mapping = THREE.EquirectangularRefractionMapping;
+    scene.background = skyTexture;
+
+    // Floor
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
-    const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your ground texture image
-    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
+    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = - Math.PI / 2;
     scene.add(floor);
 
-    // Parkour Box setup with random sizes and positions
-    const parkourBoxes = [];
-    const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your box image
-
+    // Boxes
+    const boxTexture = new THREE.TextureLoader().load('garfield.png');
+    const boxes = [];
     for (let i = 0; i < 10; i++) {
-      const boxGeometry = new THREE.BoxGeometry(Math.random() * 5 + 1, Math.random() * 3 + 1, Math.random() * 5 + 1); // Random size
+      const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
       const box = new THREE.Mesh(boxGeometry, boxMaterial);
       box.position.set(
         Math.random() * 80 - 40,
-        Math.random() * 5 + 1, // Ensure they float above the ground
+        1,
         Math.random() * 80 - 40
       );
       scene.add(box);
-      parkourBoxes.push(box);
-    }
-
-    // Improved collision system: Raycasting for better detection
-    function checkCollisions() {
-      const raycaster = new THREE.Raycaster();
-      const direction = new THREE.Vector3(0, -1, 0); // Ray pointing downwards for floor and box collisions
-      raycaster.ray.origin.copy(camera.position);
-      raycaster.ray.direction.copy(direction);
-
-      const intersects = raycaster.intersectObjects(parkourBoxes); // Check collisions with parkour boxes
-      if (intersects.length > 0) {
-        // If there's a collision with a parkour box, adjust player position
-        camera.position.y = intersects[0].point.y + cameraHeight; // Keep player above the box
-        velocityY = 0;
-        isJumping = false;
-      }
+      boxes.push(box);
     }
 
     // Enemy management
@@ -138,7 +149,7 @@
       scene.add(enemy);
     }
 
-    setInterval(spawnEnemy, 3000); // Spawn an enemy every 3 seconds
+    setInterval(spawnEnemy, 3000);
 
     function updateEnemies() {
       enemies.forEach((enemy, index) => {
@@ -156,33 +167,45 @@
       });
     }
 
-    // Bullet management
+    // Bullet shooting
+    let canShoot = true;
     const bullets = [];
+
+    document.addEventListener('click', () => {
+      if (!canShoot) return;
+      canShoot = false;
+      setTimeout(() => canShoot = true, 200);
+
+      const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+      bullet.position.copy(camera.position);
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      bullet.velocity = direction.multiplyScalar(0.5);
+      bullet.startPosition = camera.position.clone();
+      bullets.push(bullet);
+      scene.add(bullet);
+    });
+
     function updateBullets() {
       bullets.forEach((bullet, index) => {
         bullet.position.add(bullet.velocity);
-
-        // Remove bullets after 50 units or when they hit a box or enemy
         if (bullet.position.distanceTo(bullet.startPosition) > 50) {
           scene.remove(bullet);
           bullets.splice(index, 1);
         }
 
-        // Check for collisions with parkour boxes using raycasting
-        const raycaster = new THREE.Raycaster();
-        raycaster.ray.origin.copy(bullet.position);
-        raycaster.ray.direction.set(0, 0, 1); // Ray pointing forward
+        boxes.forEach((box) => {
+          const boxBoundingBox = new THREE.Box3().setFromObject(box);
+          if (bullet.position.distanceTo(box.position) < 1) {
+            scene.remove(bullet);
+            bullets.splice(index, 1);
+          }
+        });
 
-        const boxHits = raycaster.intersectObjects(parkourBoxes);
-        if (boxHits.length > 0) {
-          scene.remove(bullet); // Remove bullet on collision
-          bullets.splice(index, 1);
-        }
-
-        // Check for collisions with enemies
         enemies.forEach((enemy, enemyIndex) => {
           if (bullet.position.distanceTo(enemy.position) < 1) {
-            // Bullet hits the enemy
             enemy.health -= 25;
             if (enemy.health <= 0) {
               scene.remove(enemy);
@@ -197,32 +220,10 @@
       });
     }
 
-    // Shooting with cooldown
-    let canShoot = true;
-
-    document.addEventListener('click', () => {
-      if (!canShoot) return;
-
-      canShoot = false;
-      setTimeout(() => canShoot = true, 200); // 0.2-second cooldown
-
-      const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-      const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-      bullet.position.copy(camera.position);
-      const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      bullet.velocity = direction.multiplyScalar(0.5);
-      bullet.startPosition = camera.position.clone();
-      bullets.push(bullet);
-      scene.add(bullet);
-    });
-
-    // Game Loop
+    // Game loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
-      checkCollisions();  // Perform collision check for movement
       updateEnemies();
       updateBullets();
       renderer.render(scene, camera);
