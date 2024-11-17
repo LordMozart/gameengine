@@ -120,19 +120,18 @@
     skyTexture.mapping = THREE.EquirectangularRefractionMapping;
     scene.background = skyTexture;
 
-    // Add ground with texture
+    // Add green floor
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
-    const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your ground texture
-    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
+    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = - Math.PI / 2;
     scene.add(floor);
 
-    // Box setup with random height
+    // Box setup
     const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your box image
     const boxes = [];
     for (let i = 0; i < 10; i++) {
-      const boxGeometry = new THREE.BoxGeometry(2, Math.random() * 4 + 1, 2); // Random height
+      const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
       const box = new THREE.Mesh(boxGeometry, boxMaterial);
       box.position.set(
@@ -159,13 +158,10 @@
     // Enemy management
     const enemies = [];
     const enemySpeed = 0.05;
-    const shootingEnemySpeed = 0.03;
 
-    // Create normal and shooting enemies
     function spawnEnemy() {
-      const isShootingEnemy = Math.random() > 0.5; // 50% chance for a shooting enemy
       const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const enemyMaterial = new THREE.MeshBasicMaterial({ color: isShootingEnemy ? 0x00ff00 : 0xff0000 });
+      const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
       enemy.position.set(
         Math.random() * 40 - 20,
@@ -173,8 +169,6 @@
         Math.random() * 40 - 20
       );
       enemy.health = 50;
-      enemy.isShootingEnemy = isShootingEnemy;
-      enemy.shootingCooldown = 0;
       enemies.push(enemy);
       scene.add(enemy);
     }
@@ -185,18 +179,7 @@
       enemies.forEach((enemy, index) => {
         const direction = new THREE.Vector3();
         direction.subVectors(camera.position, enemy.position).normalize();
-        if (enemy.isShootingEnemy) {
-          // Shooting enemies shoot at the player
-          if (enemy.shootingCooldown <= 0) {
-            shootAtPlayer(enemy.position);
-            enemy.shootingCooldown = 1.5; // cooldown of 1.5 seconds
-          } else {
-            enemy.shootingCooldown -= 0.1;
-          }
-        } else {
-          // Normal enemies chase the player
-          enemy.position.addScaledVector(direction, enemySpeed);
-        }
+        enemy.position.addScaledVector(direction, enemySpeed);
 
         if (enemy.position.distanceTo(camera.position) < 1) {
           playerHealth -= 10;
@@ -208,26 +191,102 @@
       });
     }
 
-    // Shooting mechanic for shooting enemies
-    function shootAtPlayer(position) {
+    // Shooting with cooldown
+    let canShoot = true;
+
+    document.addEventListener('click', () => {
+      if (!canShoot) return;
+
+      canShoot = false;
+      setTimeout(() => canShoot = true, 200); // 0.2-second cooldown
+
       const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
       const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
       const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-      bullet.position.copy(position);
+      bullet.position.copy(camera.position);
       const direction = new THREE.Vector3();
-      direction.subVectors(camera.position, position).normalize();
-      bullet.velocity = direction.multiplyScalar(0.1);
+      camera.getWorldDirection(direction);
+      bullet.velocity = direction.multiplyScalar(0.5);
+      bullet.startPosition = camera.position.clone();
+      bullets.push(bullet);
       scene.add(bullet);
 
-      // Move bullet and check collision
-      setInterval(() => {
+      // Gun animation on shoot
+      animateGun();
+    });
+
+    const bullets = [];
+    function updateBullets() {
+      bullets.forEach((bullet, index) => {
         bullet.position.add(bullet.velocity);
-        if (bullet.position.distanceTo(camera.position) < 1) {
-          playerHealth -= 10;
-          playerHealthElement.textContent = playerHealth;
+
+        if (bullet.position.distanceTo(bullet.startPosition) > 50) {
           scene.remove(bullet);
+          bullets.splice(index, 1);
         }
-      }, 10);
+
+        enemies.forEach((enemy, enemyIndex) => {
+          if (bullet.position.distanceTo(enemy.position) < 1) {
+            enemy.health -= 25;
+            if (enemy.health <= 0) {
+              scene.remove(enemy);
+              enemies.splice(enemyIndex, 1);
+              score += 10;
+              scoreElement.textContent = score;
+            }
+            scene.remove(bullet);
+            bullets.splice(index, 1);
+          }
+        });
+      });
+    }
+
+    // Gun setup
+    const gunGroup = new THREE.Object3D();
+    const gunGeometry = new THREE.BoxGeometry(1, 0.3, 0.2);
+    const gunMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
+    const gunMesh = new THREE.Mesh(gunGeometry, gunMaterial);
+    gunGroup.add(gunMesh);
+    gunGroup.position.set(1.5, -0.5, -3);
+    camera.add(gunGroup);
+
+    // Gun animation variables
+    let gunOriginalPosition = gunGroup.position.clone();
+    let gunAnimationProgress = 0;
+    let gunAnimating = false;
+
+    // Animate the gun on shoot
+    function animateGun() {
+      if (gunAnimating) return;
+
+      gunAnimating = true;
+      gunAnimationProgress = 0;
+
+      const targetPosition = gunOriginalPosition.clone().add(new THREE.Vector3(0, 0, -0.5)); // Move slightly closer to camera
+      const startPosition = gunGroup.position.clone();
+
+      const animateStep = () => {
+        gunAnimationProgress += 0.05;
+        gunGroup.position.lerpVectors(startPosition, targetPosition, gunAnimationProgress);
+        if (gunAnimationProgress < 1) {
+          requestAnimationFrame(animateStep);
+        } else {
+          // Return back smoothly
+          gunAnimationProgress = 0;
+          const returnStep = () => {
+            gunAnimationProgress += 0.05;
+            gunGroup.position.lerpVectors(targetPosition, gunOriginalPosition, gunAnimationProgress);
+            if (gunAnimationProgress < 1) {
+              requestAnimationFrame(returnStep);
+            } else {
+              gunAnimating = false;
+            }
+          };
+          requestAnimationFrame(returnStep);
+        }
+      };
+
+      requestAnimationFrame(animateStep);
     }
 
     // Game Loop
@@ -236,6 +295,7 @@
       handlePlayerMovement();
       checkCollisions();
       updateEnemies();
+      updateBullets();
       renderer.render(scene, camera);
     }
 
