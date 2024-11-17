@@ -86,7 +86,16 @@
       velocityY += gravity;
       newPosition.y += velocityY;
 
-      // Collision with the ground
+      // Collision with the ground or parkour boxes
+      parkourBoxes.forEach((box) => {
+        const boxBoundingBox = new THREE.Box3().setFromObject(box);
+        if (newPosition.y <= box.position.y + box.scale.y / 2 && boxBoundingBox.containsPoint(newPosition)) {
+          newPosition.y = box.position.y + box.scale.y / 2;
+          velocityY = 0;
+          isJumping = false;
+        }
+      });
+
       if (newPosition.y < 1) {
         newPosition.y = 1;
         velocityY = 0;
@@ -128,67 +137,43 @@
     floor.rotation.x = - Math.PI / 2;
     scene.add(floor);
 
-    // Box setup
+    // Parkour Box setup with random sizes and positions
+    const parkourBoxes = [];
     const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your box image
-    const boxes = [];
+
     for (let i = 0; i < 10; i++) {
-      const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const boxGeometry = new THREE.BoxGeometry(Math.random() * 5 + 1, Math.random() * 3 + 1, Math.random() * 5 + 1); // Random size
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
       const box = new THREE.Mesh(boxGeometry, boxMaterial);
       box.position.set(
         Math.random() * 80 - 40,
-        1,
+        Math.random() * 5 + 1, // Ensure they float above the ground
         Math.random() * 80 - 40
       );
       scene.add(box);
-      boxes.push(box);
+      parkourBoxes.push(box);
     }
 
-    // Detect collisions with boxes
-    function checkCollisions() {
-      const playerBox = new THREE.Box3().setFromObject(camera);
-      boxes.forEach((box) => {
-        const boxBoundingBox = new THREE.Box3().setFromObject(box);
-        if (playerBox.intersectsBox(boxBoundingBox)) {
-          // Collision detected, stop player movement in that direction
-          camera.position.sub(camera.position.clone().sub(box.position).multiplyScalar(0.1));
+    // Bullet management
+    const bullets = [];
+    function updateBullets() {
+      bullets.forEach((bullet, index) => {
+        bullet.position.add(bullet.velocity);
+
+        // Remove bullets after 50 units or when they hit a box
+        if (bullet.position.distanceTo(bullet.startPosition) > 50) {
+          scene.remove(bullet);
+          bullets.splice(index, 1);
         }
-      });
-    }
 
-    // Enemy management
-    const enemies = [];
-    const enemySpeed = 0.05;
-
-    function spawnEnemy() {
-      const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-      enemy.position.set(
-        Math.random() * 40 - 20,
-        1,
-        Math.random() * 40 - 20
-      );
-      enemy.health = 50;
-      enemies.push(enemy);
-      scene.add(enemy);
-    }
-
-    setInterval(spawnEnemy, 3000); // Spawn an enemy every 3 seconds
-
-    function updateEnemies() {
-      enemies.forEach((enemy, index) => {
-        const direction = new THREE.Vector3();
-        direction.subVectors(camera.position, enemy.position).normalize();
-        enemy.position.addScaledVector(direction, enemySpeed);
-
-        if (enemy.position.distanceTo(camera.position) < 1) {
-          playerHealth -= 10;
-          playerHealthElement.textContent = playerHealth;
-          if (playerHealth <= 0) alert("Game Over!");
-          scene.remove(enemy);
-          enemies.splice(index, 1);
-        }
+        parkourBoxes.forEach((box, boxIndex) => {
+          const boxBoundingBox = new THREE.Box3().setFromObject(box);
+          if (boxBoundingBox.containsPoint(bullet.position)) {
+            // Bullet hits the box
+            scene.remove(bullet);
+            bullets.splice(index, 1);
+          }
+        });
       });
     }
 
@@ -213,38 +198,10 @@
       scene.add(bullet);
     });
 
-    const bullets = [];
-    function updateBullets() {
-      bullets.forEach((bullet, index) => {
-        bullet.position.add(bullet.velocity);
-
-        if (bullet.position.distanceTo(bullet.startPosition) > 50) {
-          scene.remove(bullet);
-          bullets.splice(index, 1);
-        }
-
-        enemies.forEach((enemy, enemyIndex) => {
-          if (bullet.position.distanceTo(enemy.position) < 1) {
-            enemy.health -= 25;
-            if (enemy.health <= 0) {
-              scene.remove(enemy);
-              enemies.splice(enemyIndex, 1);
-              score += 10;
-              scoreElement.textContent = score;
-            }
-            scene.remove(bullet);
-            bullets.splice(index, 1);
-          }
-        });
-      });
-    }
-
     // Game Loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
-      checkCollisions();
-      updateEnemies();
       updateBullets();
       renderer.render(scene, camera);
     }
