@@ -120,9 +120,10 @@
     skyTexture.mapping = THREE.EquirectangularRefractionMapping;
     scene.background = skyTexture;
 
-    // Add green floor
+    // Add ground texture
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
-    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your ground texture image
+    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = - Math.PI / 2;
     scene.add(floor);
