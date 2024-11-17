@@ -58,80 +58,28 @@
     const playerSpeed = 0.1;
     const jumpSpeed = 0.3;
 
-    // Camera height (now doubled)
+    // Camera height (doubled)
     const cameraHeight = 2;  // Changed from 1 to 2 for 200px equivalent height
+    camera.position.y = cameraHeight; // Set camera to start at the new height
 
-    // Handle player movement
-    function handlePlayerMovement() {
-      const forward = new THREE.Vector3();
-      const right = new THREE.Vector3();
+    // Mouse movement to move the camera up and down (within limits)
+    let verticalMovement = 0;
+    let mouseYSpeed = 0.002; // Sensitivity for mouse movement
 
-      camera.getWorldDirection(forward);
-      forward.y = 0;
-      forward.normalize();
-
-      right.crossVectors(forward, camera.up).normalize();
-
-      const newPosition = camera.position.clone();
-
-      if (keys['w']) newPosition.addScaledVector(forward, playerSpeed);
-      if (keys['s']) newPosition.addScaledVector(forward, -playerSpeed);
-      if (keys['a']) newPosition.addScaledVector(right, -playerSpeed);
-      if (keys['d']) newPosition.addScaledVector(right, playerSpeed);
-
-      // Jumping
-      if (keys[' '] && !isJumping) {
-        isJumping = true;
-        velocityY = jumpSpeed;
-      }
-
-      // Apply gravity
-      velocityY += gravity;
-      newPosition.y += velocityY;
-
-      // Collision with the ground or parkour boxes
-      parkourBoxes.forEach((box) => {
-        const boxBoundingBox = new THREE.Box3().setFromObject(box);
-        if (newPosition.y <= box.position.y + box.scale.y / 2 && boxBoundingBox.containsPoint(newPosition)) {
-          newPosition.y = box.position.y + box.scale.y / 2;
-          velocityY = 0;
-          isJumping = false;
-        }
-      });
-
-      if (newPosition.y < cameraHeight) {
-        newPosition.y = cameraHeight;
-        velocityY = 0;
-        isJumping = false;
-      }
-
-      // Keep player within boundaries
-      newPosition.clamp(
-        new THREE.Vector3(-50, cameraHeight, -50),
-        new THREE.Vector3(50, 10, 50)
-      );
-
-      camera.position.copy(newPosition);
-    }
-
-    // Pointer lock for mouse control
-    document.body.addEventListener('click', () => {
-      document.body.requestPointerLock();
-    });
-
-    let yaw = 0;
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
-        yaw -= event.movementX * 0.002; // Left-right rotation (yaw)
-        camera.rotation.set(0, yaw, 0); // Only apply yaw (left-right rotation)
+        // Adjust yaw based on mouse movement for left/right rotation
+        yaw -= event.movementX * 0.002;
+        camera.rotation.set(verticalMovement, yaw, 0);
+
+        // Adjust vertical camera position with mouse Y (up/down)
+        verticalMovement += event.movementY * mouseYSpeed;
+        verticalMovement = Math.max(-1.5, Math.min(1.5, verticalMovement)); // Restrict to vertical limits
+        camera.position.y = cameraHeight + verticalMovement;
       }
     });
 
-    // Set Garfield texture as the background instead of skybox
-    const garfieldTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with the image path
-    scene.background = garfieldTexture;
-
-    // Add ground texture
+    // Floor setup with texture
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
     const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your ground texture image
     const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
@@ -154,6 +102,22 @@
       );
       scene.add(box);
       parkourBoxes.push(box);
+    }
+
+    // Improved collision system: Raycasting for better detection
+    function checkCollisions() {
+      const raycaster = new THREE.Raycaster();
+      const direction = new THREE.Vector3(0, -1, 0); // Ray pointing downwards for floor and box collisions
+      raycaster.ray.origin.copy(camera.position);
+      raycaster.ray.direction.copy(direction);
+
+      const intersects = raycaster.intersectObjects(parkourBoxes); // Check collisions with parkour boxes
+      if (intersects.length > 0) {
+        // If there's a collision with a parkour box, adjust player position
+        camera.position.y = intersects[0].point.y + cameraHeight; // Keep player above the box
+        velocityY = 0;
+        isJumping = false;
+      }
     }
 
     // Enemy management
@@ -204,15 +168,16 @@
           bullets.splice(index, 1);
         }
 
-        // Check for collisions with parkour boxes
-        parkourBoxes.forEach((box, boxIndex) => {
-          const boxBoundingBox = new THREE.Box3().setFromObject(box);
-          if (boxBoundingBox.containsPoint(bullet.position)) {
-            // Bullet hits the box
-            scene.remove(bullet);
-            bullets.splice(index, 1);
-          }
-        });
+        // Check for collisions with parkour boxes using raycasting
+        const raycaster = new THREE.Raycaster();
+        raycaster.ray.origin.copy(bullet.position);
+        raycaster.ray.direction.set(0, 0, 1); // Ray pointing forward
+
+        const boxHits = raycaster.intersectObjects(parkourBoxes);
+        if (boxHits.length > 0) {
+          scene.remove(bullet); // Remove bullet on collision
+          bullets.splice(index, 1);
+        }
 
         // Check for collisions with enemies
         enemies.forEach((enemy, enemyIndex) => {
@@ -257,6 +222,7 @@
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
+      checkCollisions();  // Perform collision check for movement
       updateEnemies();
       updateBullets();
       renderer.render(scene, camera);
