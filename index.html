@@ -195,16 +195,33 @@
       bullets.forEach((bullet, index) => {
         bullet.position.add(bullet.velocity);
 
-        // Remove bullets after 50 units or when they hit a box
+        // Remove bullets after 50 units or when they hit a box or enemy
         if (bullet.position.distanceTo(bullet.startPosition) > 50) {
           scene.remove(bullet);
           bullets.splice(index, 1);
         }
 
+        // Check for collisions with parkour boxes
         parkourBoxes.forEach((box, boxIndex) => {
           const boxBoundingBox = new THREE.Box3().setFromObject(box);
           if (boxBoundingBox.containsPoint(bullet.position)) {
             // Bullet hits the box
+            scene.remove(bullet);
+            bullets.splice(index, 1);
+          }
+        });
+
+        // Check for collisions with enemies
+        enemies.forEach((enemy, enemyIndex) => {
+          if (bullet.position.distanceTo(enemy.position) < 1) {
+            // Bullet hits the enemy
+            enemy.health -= 25;
+            if (enemy.health <= 0) {
+              scene.remove(enemy);
+              enemies.splice(enemyIndex, 1);
+              score += 10;
+              scoreElement.textContent = score;
+            }
             scene.remove(bullet);
             bullets.splice(index, 1);
           }
