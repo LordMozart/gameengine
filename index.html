@@ -28,7 +28,7 @@
 </head>
 <body>
   <div id="crosshair"></div>
-  <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span></div>
+  <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span> | Level: <span id="level">1</span></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
   <script>
     // Basic setup
@@ -41,33 +41,24 @@
     // HUD elements
     const playerHealthElement = document.getElementById("playerHealth");
     const scoreElement = document.getElementById("score");
+    const levelElement = document.getElementById("level");
 
     // Player properties
     let playerHealth = 100;
     let score = 0;
+    let level = 1;
 
-    // Pointer lock for mouse control
-    document.body.addEventListener('click', () => {
-      document.body.requestPointerLock();
-    });
-
-    let mouseX = 0, mouseY = 0;
-    document.addEventListener('mousemove', (event) => {
-      if (document.pointerLockElement === document.body) {
-        mouseX += event.movementX * 0.002;
-        mouseY -= event.movementY * 0.002; // Invert Y-axis for natural movement
-        mouseY = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, mouseY)); // Clamp vertical rotation
-        camera.rotation.y = -mouseX;
-        camera.rotation.x = mouseY;
-      }
-    });
-
-    // Player movement
+    // Movement controls
     const keys = {};
+    let isJumping = false;
+    let velocityY = 0;
+    const gravity = -0.01;
+
     document.addEventListener('keydown', (e) => keys[e.key] = true);
     document.addEventListener('keyup', (e) => keys[e.key] = false);
 
     const playerSpeed = 0.1;
+    const jumpSpeed = 0.3;
 
     function handlePlayerMovement() {
       const forward = new THREE.Vector3();
@@ -77,7 +68,7 @@
       forward.y = 0;
       forward.normalize();
 
-      right.crossVectors(forward, camera.up).normalize(); // Fixed right vector
+      right.crossVectors(forward, camera.up).normalize();
 
       const newPosition = camera.position.clone();
 
@@ -86,24 +77,56 @@
       if (keys['a']) newPosition.addScaledVector(right, -playerSpeed);
       if (keys['d']) newPosition.addScaledVector(right, playerSpeed);
 
+      // Jumping
+      if (keys[' '] && !isJumping) {
+        isJumping = true;
+        velocityY = jumpSpeed;
+      }
+
+      // Apply gravity
+      velocityY += gravity;
+      newPosition.y += velocityY;
+
+      // Collision with the ground
+      if (newPosition.y < 1) {
+        newPosition.y = 1;
+        velocityY = 0;
+        isJumping = false;
+      }
+
       // Keep player within boundaries
       newPosition.clamp(
         new THREE.Vector3(-50, 1, -50),
         new THREE.Vector3(50, 10, 50)
       );
 
-      camera.position.copy(newPosition); // Apply new position after boundary check
+      camera.position.copy(newPosition);
     }
+
+    // Pointer lock for mouse control
+    document.body.addEventListener('click', () => {
+      document.body.requestPointerLock();
+    });
+
+    let yaw = 0, pitch = 0;
+    document.addEventListener('mousemove', (event) => {
+      if (document.pointerLockElement === document.body) {
+        yaw -= event.movementX * 0.002;
+        pitch -= event.movementY * 0.002;
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        camera.rotation.set(pitch, yaw, 0);
+      }
+    });
 
     // Skybox setup
     const loader = new THREE.CubeTextureLoader();
     const skyboxTexture = loader.load([
-      './textures/garfield_px.png', // Right
-      './textures/garfield_nx.png', // Left
-      './textures/garfield_py.png', // Top
-      './textures/garfield_ny.png', // Bottom
-      './textures/garfield_pz.png', // Front
-      './textures/garfield_nz.png', // Back
+      './textures/garfield_px.png',
+      './textures/garfield_nx.png',
+      './textures/garfield_py.png',
+      './textures/garfield_ny.png',
+      './textures/garfield_pz.png',
+      './textures/garfield_nz.png',
     ]);
     scene.background = skyboxTexture;
 
@@ -139,15 +162,12 @@
       scene.add(enemy);
     }
 
-    setInterval(spawnEnemy, 3000); // Spawn an enemy every 3 seconds
-
     function updateEnemies() {
       enemies.forEach((enemy, index) => {
         const direction = new THREE.Vector3();
         direction.subVectors(camera.position, enemy.position).normalize();
         enemy.position.addScaledVector(direction, enemySpeed);
 
-        // Check if close enough to "attack" player
         if (enemy.position.distanceTo(camera.position) < 1) {
           playerHealth -= 10;
           playerHealthElement.textContent = playerHealth;
@@ -158,36 +178,37 @@
       });
     }
 
-    // Player shooting
-    const bullets = [];
-    const bulletSpeed = 0.5;
-    const bulletMaxDistance = 50;
+    // Shooting with cooldown
+    let canShoot = true;
 
     document.addEventListener('click', () => {
+      if (!canShoot) return;
+
+      canShoot = false;
+      setTimeout(() => canShoot = true, 200); // 0.2-second cooldown
+
       const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
       const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
       const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
       bullet.position.copy(camera.position);
       const direction = new THREE.Vector3();
       camera.getWorldDirection(direction);
-      bullet.velocity = direction.multiplyScalar(bulletSpeed);
+      bullet.velocity = direction.multiplyScalar(0.5);
       bullet.startPosition = camera.position.clone();
       bullets.push(bullet);
       scene.add(bullet);
     });
 
+    const bullets = [];
     function updateBullets() {
       bullets.forEach((bullet, index) => {
         bullet.position.add(bullet.velocity);
 
-        // Remove bullets that exceed max distance
-        if (bullet.position.distanceTo(bullet.startPosition) > bulletMaxDistance) {
+        if (bullet.position.distanceTo(bullet.startPosition) > 50) {
           scene.remove(bullet);
           bullets.splice(index, 1);
-          return;
         }
 
-        // Check collisions with enemies
         enemies.forEach((enemy, enemyIndex) => {
           if (bullet.position.distanceTo(enemy.position) < 1) {
             enemy.health -= 25;
@@ -195,7 +216,9 @@
               scene.remove(enemy);
               enemies.splice(enemyIndex, 1);
               score += 10;
+              if (score % 50 === 0) level++; // Increase level every 50 points
               scoreElement.textContent = score;
+              levelElement.textContent = level;
             }
             scene.remove(bullet);
             bullets.splice(index, 1);
@@ -204,7 +227,7 @@
       });
     }
 
-    // Game Loop
+    // Game loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
