@@ -82,14 +82,25 @@
       if (keys['s']) camera.position.addScaledVector(forward, -playerSpeed);
       if (keys['a']) camera.position.addScaledVector(right, -playerSpeed);
       if (keys['d']) camera.position.addScaledVector(right, playerSpeed);
+
+      // Keep player within boundaries
+      camera.position.clamp(
+        new THREE.Vector3(-50, 1, -50),
+        new THREE.Vector3(50, 10, 50)
+      );
     }
 
-    // Environment setup
-    const floorGeometry = new THREE.PlaneGeometry(100, 100);
-    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
-    scene.add(floor);
+    // Skybox setup
+    const loader = new THREE.CubeTextureLoader();
+    const skyboxTexture = loader.load([
+      'https://threejs.org/examples/textures/cube/skybox/px.jpg', // Right
+      'https://threejs.org/examples/textures/cube/skybox/nx.jpg', // Left
+      'https://threejs.org/examples/textures/cube/skybox/py.jpg', // Top
+      'https://threejs.org/examples/textures/cube/skybox/ny.jpg', // Bottom
+      'https://threejs.org/examples/textures/cube/skybox/pz.jpg', // Front
+      'https://threejs.org/examples/textures/cube/skybox/nz.jpg'  // Back
+    ]);
+    scene.background = skyboxTexture;
 
     // Enemy management
     const enemies = [];
@@ -99,7 +110,11 @@
       const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
       const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-      enemy.position.set(Math.random() * 20 - 10, 1, Math.random() * 20 - 10);
+      enemy.position.set(
+        Math.random() * 40 - 20,
+        1,
+        Math.random() * 40 - 20
+      );
       enemy.health = 50;
       enemies.push(enemy);
       scene.add(enemy);
@@ -125,6 +140,10 @@
     }
 
     // Player shooting
+    const bullets = [];
+    const bulletSpeed = 0.5;
+    const bulletMaxDistance = 50;
+
     document.addEventListener('click', () => {
       const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
       const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
@@ -132,32 +151,46 @@
       bullet.position.copy(camera.position);
       const direction = new THREE.Vector3();
       camera.getWorldDirection(direction);
-      bullet.velocity = direction.multiplyScalar(0.2);
+      bullet.velocity = direction.multiplyScalar(bulletSpeed);
+      bullet.startPosition = camera.position.clone();
+      bullets.push(bullet);
       scene.add(bullet);
+    });
 
-      const interval = setInterval(() => {
+    function updateBullets() {
+      bullets.forEach((bullet, index) => {
         bullet.position.add(bullet.velocity);
-        enemies.forEach((enemy, index) => {
+
+        // Remove bullets that exceed max distance
+        if (bullet.position.distanceTo(bullet.startPosition) > bulletMaxDistance) {
+          scene.remove(bullet);
+          bullets.splice(index, 1);
+          return;
+        }
+
+        // Check collisions with enemies
+        enemies.forEach((enemy, enemyIndex) => {
           if (bullet.position.distanceTo(enemy.position) < 1) {
             enemy.health -= 25;
             if (enemy.health <= 0) {
               scene.remove(enemy);
-              enemies.splice(index, 1);
+              enemies.splice(enemyIndex, 1);
               score += 10;
               scoreElement.textContent = score;
             }
             scene.remove(bullet);
-            clearInterval(interval);
+            bullets.splice(index, 1);
           }
         });
-      }, 16);
-    });
+      });
+    }
 
     // Game Loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
       updateEnemies();
+      updateBullets();
       renderer.render(scene, camera);
     }
 
