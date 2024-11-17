@@ -24,26 +24,52 @@
       color: white;
       font-family: Arial, sans-serif;
     }
+    #gunCanvas {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 150px;
+      height: 150px;
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
   <div id="crosshair"></div>
   <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span></div>
+  <canvas id="gunCanvas"></canvas>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r110/examples/js/loaders/GLTFLoader.js"></script>
   <script>
+    // Basic setup for main scene (game world)
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
+    // HUD elements
     const playerHealthElement = document.getElementById("playerHealth");
     const scoreElement = document.getElementById("score");
 
-    let playerHealth = 100;
-    let score = 0;
+    // Gun scene setup
+    const gunCanvas = document.getElementById('gunCanvas');
+    const gunRenderer = new THREE.WebGLRenderer({ canvas: gunCanvas });
+    gunRenderer.setSize(150, 150); // Set canvas size
+    const gunScene = new THREE.Scene();
+    const gunCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000); // Adjusted to 1:1 aspect ratio for gun
 
+    // Load the gun model into the second scene
+    const loader = new THREE.GLTFLoader();
+    loader.load('scene.gltf', (gltf) => {
+      const gun = gltf.scene;
+      gun.scale.set(0.5, 0.5, 0.5); // Adjust scale
+      gun.position.set(0, 0, -1); // Position it slightly off the camera
+      gunScene.add(gun);
+      gunCamera.position.set(0, 0, 5); // Position the gun in view for the mini camera
+    });
+
+    // Camera and movement handling for the main game world (first scene)
     const keys = {};
     let isJumping = false;
     let velocityY = 0;
@@ -55,7 +81,6 @@
     const playerSpeed = 0.1;
     const jumpSpeed = 0.3;
 
-    // Player movement logic
     function handlePlayerMovement() {
       const forward = new THREE.Vector3();
       const right = new THREE.Vector3();
@@ -90,68 +115,41 @@
       camera.position.copy(newPosition);
     }
 
-    // Pointer Lock for mouse control
-    document.body.addEventListener('click', () => {
-      document.body.requestPointerLock();
-    });
+    // Skybox setup with a single image (adjust as needed)
+    const skyTexture = new THREE.TextureLoader().load('sky.jpg');
+    skyTexture.mapping = THREE.EquirectangularRefractionMapping;
+    scene.background = skyTexture;
 
-    let yaw = 0;
-    document.addEventListener('mousemove', (event) => {
-      if (document.pointerLockElement === document.body) {
-        yaw -= event.movementX * 0.002;
-        camera.rotation.set(0, yaw, 0);
-      }
-    });
-
-    // Skybox with color fallback
-    const skyTexture = new THREE.TextureLoader().load('garfield.png', () => {
-      console.log("Skybox loaded!");
-    }, undefined, (error) => {
-      console.error("Skybox load failed", error);
-      scene.background = new THREE.Color(0x87ceeb); // Default color if texture fails
-    });
-
-    // Floor and box setup
+    // Add ground with texture
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
-    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const floorTexture = new THREE.TextureLoader().load('ground.jpg');
+    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
+    floor.rotation.x = - Math.PI / 2;
     scene.add(floor);
 
+    // Box setup with random height
+    const boxTexture = new THREE.TextureLoader().load('garfield.png');
     const boxes = [];
-    const boxTexture = new THREE.TextureLoader().load('garfield.png', () => {
-      console.log("Box texture loaded!");
-    });
-
     for (let i = 0; i < 10; i++) {
-      const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const boxGeometry = new THREE.BoxGeometry(2, Math.random() * 4 + 1, 2); // Random height
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
       const box = new THREE.Mesh(boxGeometry, boxMaterial);
-      box.position.set(Math.random() * 80 - 40, 1, Math.random() * 80 - 40);
+      box.position.set(
+        Math.random() * 80 - 40,
+        1,
+        Math.random() * 80 - 40
+      );
       scene.add(box);
       boxes.push(box);
     }
-
-    // Loading gun model
-    const gunGroup = new THREE.Group();
-    const loader = new THREE.GLTFLoader();
-
-    loader.load('scene.gltf', (gltf) => {
-      console.log("Gun model loaded!");
-      const gun = gltf.scene;
-      gun.scale.set(0.5, 0.5, 0.5);
-      gun.position.set(1.5, -0.5, -3);
-      gunGroup.add(gun);
-      camera.add(gunGroup);
-    }, undefined, (error) => {
-      console.error("Gun model load failed", error);
-    });
 
     // Game loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
-      renderer.render(scene, camera);
+      renderer.render(scene, camera); // Render the game world
+      gunRenderer.render(gunScene, gunCamera); // Render the gun scene
     }
 
     animate();
