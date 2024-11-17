@@ -122,6 +122,8 @@
     let pitch = 0; // Vertical (Up-Down) rotation
     let yaw = 0; // Horizontal (Left-Right) rotation
 
+    const maxPitch = Math.PI / 2; // Limit the pitch to ±90 degrees (no flipping)
+
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
         // Adjust the yaw (left-right) for horizontal mouse movement
@@ -131,10 +133,10 @@
         pitch -= event.movementY * 0.002;
 
         // Limit the pitch (up-down) to prevent the camera from rotating too far
-        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
 
         // Apply the rotations
-        camera.rotation.set(pitch, yaw, 0);  // Pitch for up-down, yaw for left-right
+        camera.rotation.set(pitch, yaw, 0);  // pitch for up-down, yaw for left-right
       }
     });
 
