@@ -116,22 +116,23 @@
     });
 
     // Skybox setup with single image
-    const skyTexture = new THREE.TextureLoader().load('garfield.png');
+    const skyTexture = new THREE.TextureLoader().load('sky.jpg'); // Replace with your panoramic image
     skyTexture.mapping = THREE.EquirectangularRefractionMapping;
     scene.background = skyTexture;
 
-    // Add green floor
+    // Add ground with texture
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
-    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your ground texture
+    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = - Math.PI / 2;
     scene.add(floor);
 
-    // Box setup
+    // Box setup with random height
     const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your box image
     const boxes = [];
     for (let i = 0; i < 10; i++) {
-      const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const boxGeometry = new THREE.BoxGeometry(2, Math.random() * 4 + 1, 2); // Random height
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
       const box = new THREE.Mesh(boxGeometry, boxMaterial);
       box.position.set(
@@ -158,10 +159,13 @@
     // Enemy management
     const enemies = [];
     const enemySpeed = 0.05;
+    const shootingEnemySpeed = 0.03;
 
+    // Create normal and shooting enemies
     function spawnEnemy() {
+      const isShootingEnemy = Math.random() > 0.5; // 50% chance for a shooting enemy
       const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+      const enemyMaterial = new THREE.MeshBasicMaterial({ color: isShootingEnemy ? 0x00ff00 : 0xff0000 });
       const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
       enemy.position.set(
         Math.random() * 40 - 20,
@@ -169,6 +173,8 @@
         Math.random() * 40 - 20
       );
       enemy.health = 50;
+      enemy.isShootingEnemy = isShootingEnemy;
+      enemy.shootingCooldown = 0;
       enemies.push(enemy);
       scene.add(enemy);
     }
@@ -179,7 +185,18 @@
       enemies.forEach((enemy, index) => {
         const direction = new THREE.Vector3();
         direction.subVectors(camera.position, enemy.position).normalize();
-        enemy.position.addScaledVector(direction, enemySpeed);
+        if (enemy.isShootingEnemy) {
+          // Shooting enemies shoot at the player
+          if (enemy.shootingCooldown <= 0) {
+            shootAtPlayer(enemy.position);
+            enemy.shootingCooldown = 1.5; // cooldown of 1.5 seconds
+          } else {
+            enemy.shootingCooldown -= 0.1;
+          }
+        } else {
+          // Normal enemies chase the player
+          enemy.position.addScaledVector(direction, enemySpeed);
+        }
 
         if (enemy.position.distanceTo(camera.position) < 1) {
           playerHealth -= 10;
@@ -191,51 +208,26 @@
       });
     }
 
-    // Shooting with cooldown
-    let canShoot = true;
-
-    document.addEventListener('click', () => {
-      if (!canShoot) return;
-
-      canShoot = false;
-      setTimeout(() => canShoot = true, 200); // 0.2-second cooldown
-
+    // Shooting mechanic for shooting enemies
+    function shootAtPlayer(position) {
       const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
       const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
       const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-      bullet.position.copy(camera.position);
+      bullet.position.copy(position);
       const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      bullet.velocity = direction.multiplyScalar(0.5);
-      bullet.startPosition = camera.position.clone();
-      bullets.push(bullet);
+      direction.subVectors(camera.position, position).normalize();
+      bullet.velocity = direction.multiplyScalar(0.1);
       scene.add(bullet);
-    });
 
-    const bullets = [];
-    function updateBullets() {
-      bullets.forEach((bullet, index) => {
+      // Move bullet and check collision
+      setInterval(() => {
         bullet.position.add(bullet.velocity);
-
-        if (bullet.position.distanceTo(bullet.startPosition) > 50) {
+        if (bullet.position.distanceTo(camera.position) < 1) {
+          playerHealth -= 10;
+          playerHealthElement.textContent = playerHealth;
           scene.remove(bullet);
-          bullets.splice(index, 1);
         }
-
-        enemies.forEach((enemy, enemyIndex) => {
-          if (bullet.position.distanceTo(enemy.position) < 1) {
-            enemy.health -= 25;
-            if (enemy.health <= 0) {
-              scene.remove(enemy);
-              enemies.splice(enemyIndex, 1);
-              score += 10;
-              scoreElement.textContent = score;
-            }
-            scene.remove(bullet);
-            bullets.splice(index, 1);
-          }
-        });
-      });
+      }, 10);
     }
 
     // Game Loop
@@ -244,7 +236,6 @@
       handlePlayerMovement();
       checkCollisions();
       updateEnemies();
-      updateBullets();
       renderer.render(scene, camera);
     }
 
