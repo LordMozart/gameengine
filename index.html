@@ -243,25 +243,33 @@
       });
     }
 
-    // Shooting
+    // Shooting with cooldown
+    let canShoot = true;
+
     document.addEventListener('click', () => {
-      const bulletGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      if (!canShoot) return;
+
+      canShoot = false;
+      setTimeout(() => canShoot = true, 200); // 0.2-second cooldown
+
+      const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
       const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-      bullet.position.set(camera.position.x, camera.position.y, camera.position.z);
-      bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(0.5);
+      bullet.position.copy(camera.position);
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      bullet.velocity = direction.multiplyScalar(0.5);
+      bullet.startPosition = camera.position.clone();
       bullets.push(bullet);
       scene.add(bullet);
     });
 
-    // Main animation loop
+    // Game Loop
     function animate() {
       requestAnimationFrame(animate);
-
       handlePlayerMovement();
       updateEnemies();
       updateBullets();
-
       renderer.render(scene, camera);
     }
 
