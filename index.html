@@ -31,38 +31,49 @@
   <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
   <script>
+    // Basic setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
+    // HUD elements
     const playerHealthElement = document.getElementById("playerHealth");
     const scoreElement = document.getElementById("score");
 
+    // Player properties
     let playerHealth = 100;
     let score = 0;
 
-    // Movement control
+    // Movement controls
     const keys = {};
     let isJumping = false;
     let velocityY = 0;
     const gravity = -0.01;
-    const playerSpeed = 0.1;
-    const jumpSpeed = 0.3;
 
     document.addEventListener('keydown', (e) => keys[e.key] = true);
     document.addEventListener('keyup', (e) => keys[e.key] = false);
 
+    const playerSpeed = 0.1;
+    const jumpSpeed = 0.3;
+
+    // Camera height (now doubled)
+    const cameraHeight = 2;  // Changed from 1 to 2 for 200px equivalent height
+
+    // Handle player movement
     function handlePlayerMovement() {
       const forward = new THREE.Vector3();
       const right = new THREE.Vector3();
+
       camera.getWorldDirection(forward);
       forward.y = 0;
       forward.normalize();
+
       right.crossVectors(forward, camera.up).normalize();
 
       const newPosition = camera.position.clone();
+
       if (keys['w']) newPosition.addScaledVector(forward, playerSpeed);
       if (keys['s']) newPosition.addScaledVector(forward, -playerSpeed);
       if (keys['a']) newPosition.addScaledVector(right, -playerSpeed);
@@ -74,61 +85,83 @@
         velocityY = jumpSpeed;
       }
 
+      // Apply gravity
       velocityY += gravity;
       newPosition.y += velocityY;
 
-      if (newPosition.y < 1) {
-        newPosition.y = 1;
+      // Collision with the ground or parkour boxes
+      parkourBoxes.forEach((box) => {
+        const boxBoundingBox = new THREE.Box3().setFromObject(box);
+        if (newPosition.y <= box.position.y + box.scale.y / 2 && boxBoundingBox.containsPoint(newPosition)) {
+          newPosition.y = box.position.y + box.scale.y / 2;
+          velocityY = 0;
+          isJumping = false;
+        }
+      });
+
+      if (newPosition.y < cameraHeight) {
+        newPosition.y = cameraHeight;
         velocityY = 0;
         isJumping = false;
       }
 
+      // Keep player within boundaries
       newPosition.clamp(
-        new THREE.Vector3(-50, 1, -50),
+        new THREE.Vector3(-50, cameraHeight, -50),
         new THREE.Vector3(50, 10, 50)
       );
 
       camera.position.copy(newPosition);
     }
 
+    // Pointer lock for mouse control
     document.body.addEventListener('click', () => {
       document.body.requestPointerLock();
     });
 
     let yaw = 0;
+    let pitch = 0;
+    const pitchLimit = Math.PI / 2;  // Limit vertical rotation to prevent flipping
+
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
-        yaw -= event.movementX * 0.002;
-        camera.rotation.set(0, yaw, 0);
+        yaw -= event.movementX * 0.002; // Left-right rotation (yaw)
+        pitch -= event.movementY * 0.002; // Up-down rotation (pitch)
+
+        // Limit pitch to avoid flipping
+        pitch = Math.max(-pitchLimit, Math.min(pitch, pitchLimit));
+
+        camera.rotation.set(pitch, yaw, 0); // Apply pitch and yaw to camera
       }
     });
 
-    // Skybox
-    const skyTexture = new THREE.TextureLoader().load('sky.jpg');
-    skyTexture.mapping = THREE.EquirectangularRefractionMapping;
-    scene.background = skyTexture;
+    // Set Garfield texture as the background instead of skybox
+    const garfieldTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with the image path
+    scene.background = garfieldTexture;
 
-    // Floor
+    // Add ground texture
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
-    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your ground texture image
+    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = - Math.PI / 2;
     scene.add(floor);
 
-    // Boxes
-    const boxTexture = new THREE.TextureLoader().load('garfield.png');
-    const boxes = [];
+    // Parkour Box setup with random sizes and positions
+    const parkourBoxes = [];
+    const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your box image
+
     for (let i = 0; i < 10; i++) {
-      const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const boxGeometry = new THREE.BoxGeometry(Math.random() * 5 + 1, Math.random() * 3 + 1, Math.random() * 5 + 1); // Random size
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
       const box = new THREE.Mesh(boxGeometry, boxMaterial);
       box.position.set(
         Math.random() * 80 - 40,
-        1,
+        Math.random() * 5 + 1, // Ensure they float above the ground
         Math.random() * 80 - 40
       );
       scene.add(box);
-      boxes.push(box);
+      parkourBoxes.push(box);
     }
 
     // Enemy management
@@ -149,7 +182,7 @@
       scene.add(enemy);
     }
 
-    setInterval(spawnEnemy, 3000);
+    setInterval(spawnEnemy, 3000); // Spawn an enemy every 3 seconds
 
     function updateEnemies() {
       enemies.forEach((enemy, index) => {
@@ -167,45 +200,32 @@
       });
     }
 
-    // Bullet shooting
-    let canShoot = true;
+    // Bullet management
     const bullets = [];
-
-    document.addEventListener('click', () => {
-      if (!canShoot) return;
-      canShoot = false;
-      setTimeout(() => canShoot = true, 200);
-
-      const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-      const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-      bullet.position.copy(camera.position);
-      const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      bullet.velocity = direction.multiplyScalar(0.5);
-      bullet.startPosition = camera.position.clone();
-      bullets.push(bullet);
-      scene.add(bullet);
-    });
-
     function updateBullets() {
       bullets.forEach((bullet, index) => {
         bullet.position.add(bullet.velocity);
+
+        // Remove bullets after 50 units or when they hit a box or enemy
         if (bullet.position.distanceTo(bullet.startPosition) > 50) {
           scene.remove(bullet);
           bullets.splice(index, 1);
         }
 
-        boxes.forEach((box) => {
+        // Check for collisions with parkour boxes
+        parkourBoxes.forEach((box, boxIndex) => {
           const boxBoundingBox = new THREE.Box3().setFromObject(box);
-          if (bullet.position.distanceTo(box.position) < 1) {
+          if (boxBoundingBox.containsPoint(bullet.position)) {
+            // Bullet hits the box
             scene.remove(bullet);
             bullets.splice(index, 1);
           }
         });
 
+        // Check for collisions with enemies
         enemies.forEach((enemy, enemyIndex) => {
           if (bullet.position.distanceTo(enemy.position) < 1) {
+            // Bullet hits the enemy
             enemy.health -= 25;
             if (enemy.health <= 0) {
               scene.remove(enemy);
@@ -220,7 +240,28 @@
       });
     }
 
-    // Game loop
+    // Shooting with cooldown
+    let canShoot = true;
+
+    document.addEventListener('click', () => {
+      if (!canShoot) return;
+
+      canShoot = false;
+      setTimeout(() => canShoot = true, 200); // 0.2-second cooldown
+
+      const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+      bullet.position.copy(camera.position);
+      const direction = new THREE.Vector3();
+      camera.getWorldDirection(direction);
+      bullet.velocity = direction.multiplyScalar(0.5);
+      bullet.startPosition = camera.position.clone();
+      bullets.push(bullet);
+      scene.add(bullet);
+    });
+
+    // Game Loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
