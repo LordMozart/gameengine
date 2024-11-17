@@ -55,9 +55,10 @@
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
         mouseX += event.movementX * 0.002;
-        mouseY += event.movementY * 0.002;
+        mouseY -= event.movementY * 0.002; // Invert Y-axis for natural movement
+        mouseY = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, mouseY)); // Clamp vertical rotation
         camera.rotation.y = -mouseX;
-        camera.rotation.x = -mouseY;
+        camera.rotation.x = mouseY;
       }
     });
 
@@ -76,7 +77,7 @@
       forward.y = 0;
       forward.normalize();
 
-      right.crossVectors(camera.up, forward).normalize();
+      right.crossVectors(forward, camera.up).normalize(); // Fixed right vector
 
       if (keys['w']) camera.position.addScaledVector(forward, playerSpeed);
       if (keys['s']) camera.position.addScaledVector(forward, -playerSpeed);
@@ -93,12 +94,12 @@
     // Skybox setup
     const loader = new THREE.CubeTextureLoader();
     const skyboxTexture = loader.load([
-      'garfield.png', // Right
-      'garfield.png', // Left
-      'garfield.png', // Top
-      'garfield.png', // Bottom
-      'garfield.png', // Front
-      'garfield.png'  // Back
+      './textures/garfield_px.png', // Right
+      './textures/garfield_nx.png', // Left
+      './textures/garfield_py.png', // Top
+      './textures/garfield_ny.png', // Bottom
+      './textures/garfield_pz.png', // Front
+      './textures/garfield_nz.png', // Back
     ]);
     scene.background = skyboxTexture;
 
