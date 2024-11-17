@@ -119,19 +119,22 @@
       document.body.requestPointerLock();
     });
 
-    let yaw = 0;
-    let pitch = 0;
-    const pitchLimit = Math.PI / 2;  // Limit vertical rotation to prevent flipping
+    let pitch = 0; // Vertical (Up-Down) rotation
+    let yaw = 0; // Horizontal (Left-Right) rotation
 
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
-        yaw -= event.movementX * 0.002; // Left-right rotation (yaw)
-        pitch -= event.movementY * 0.002; // Up-down rotation (pitch)
+        // Adjust the yaw (left-right) for horizontal mouse movement
+        yaw -= event.movementX * 0.002;
 
-        // Limit pitch to avoid flipping
-        pitch = Math.max(-pitchLimit, Math.min(pitch, pitchLimit));
+        // Adjust the pitch (up-down) for vertical mouse movement
+        pitch -= event.movementY * 0.002;
 
-        camera.rotation.set(pitch, yaw, 0); // Apply pitch and yaw to camera
+        // Limit the pitch (up-down) to prevent the camera from rotating too far
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+
+        // Apply the rotations
+        camera.rotation.set(pitch, yaw, 0);  // Pitch for up-down, yaw for left-right
       }
     });
 
@@ -240,33 +243,25 @@
       });
     }
 
-    // Shooting with cooldown
-    let canShoot = true;
-
+    // Shooting
     document.addEventListener('click', () => {
-      if (!canShoot) return;
-
-      canShoot = false;
-      setTimeout(() => canShoot = true, 200); // 0.2-second cooldown
-
-      const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const bulletGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-      bullet.position.copy(camera.position);
-      const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      bullet.velocity = direction.multiplyScalar(0.5);
-      bullet.startPosition = camera.position.clone();
+      bullet.position.set(camera.position.x, camera.position.y, camera.position.z);
+      bullet.velocity = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).multiplyScalar(0.5);
       bullets.push(bullet);
       scene.add(bullet);
     });
 
-    // Game Loop
+    // Main animation loop
     function animate() {
       requestAnimationFrame(animate);
+
       handlePlayerMovement();
       updateEnemies();
       updateBullets();
+
       renderer.render(scene, camera);
     }
 
