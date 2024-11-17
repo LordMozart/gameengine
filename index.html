@@ -30,6 +30,7 @@
   <div id="crosshair"></div>
   <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r110/examples/js/loaders/GLTFLoader.js"></script> <!-- Load GLTFLoader -->
   <script>
     // Basic setup
     const scene = new THREE.Scene();
@@ -241,17 +242,20 @@
       });
     }
 
-    // Gun setup
-    const gunGroup = new THREE.Object3D();
-    const gunGeometry = new THREE.BoxGeometry(1, 0.3, 0.2);
-    const gunMaterial = new THREE.MeshBasicMaterial({ color: 0x555555 });
-    const gunMesh = new THREE.Mesh(gunGeometry, gunMaterial);
-    gunGroup.add(gunMesh);
-    gunGroup.position.set(1.5, -0.5, -3);
-    camera.add(gunGroup);
+    // Gun Model (GLTF)
+    const gunGroup = new THREE.Group();
+    const loader = new THREE.GLTFLoader();
+
+    loader.load('models/gun_model.gltf', (gltf) => {
+      const gun = gltf.scene;
+      gun.scale.set(0.5, 0.5, 0.5); // Adjust size if needed
+      gun.position.set(1.5, -0.5, -3);
+      gunGroup.add(gun);
+      camera.add(gunGroup);
+    });
 
     // Gun animation variables
-    let gunOriginalPosition = gunGroup.position.clone();
+    let gunOriginalPosition = new THREE.Vector3(1.5, -0.5, -3);
     let gunAnimationProgress = 0;
     let gunAnimating = false;
 
