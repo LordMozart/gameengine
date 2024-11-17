@@ -110,16 +110,17 @@
     let yaw = 0, pitch = 0;
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
-        yaw -= event.movementX * 0.002;
-        pitch -= event.movementY * 0.002;
-        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch)); // Clamp vertical rotation
+        yaw -= event.movementX * 0.002; // Left-right rotation (yaw)
+        pitch -= event.movementY * 0.002; // Up-down rotation (pitch)
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch)); // Clamp pitch
         camera.rotation.set(pitch, yaw, 0); // Apply pitch and yaw
       }
     });
 
-    // Skybox setup (single image as sky texture)
-    const texture = new THREE.TextureLoader().load('sky.jpg'); // Replace with your sky image
-    scene.background = texture;
+    // Skybox setup with single image
+    const skyTexture = new THREE.TextureLoader().load('sky.jpg'); // Replace with your panoramic image
+    skyTexture.mapping = THREE.EquirectangularRefractionMapping;
+    scene.background = skyTexture;
 
     // Add green floor
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
@@ -173,6 +174,8 @@
       enemies.push(enemy);
       scene.add(enemy);
     }
+
+    setInterval(spawnEnemy, 3000); // Spawn an enemy every 3 seconds
 
     function updateEnemies() {
       enemies.forEach((enemy, index) => {
@@ -237,11 +240,11 @@
       });
     }
 
-    // Game loop
+    // Game Loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
-      checkCollisions(); // Check collisions with boxes
+      checkCollisions();
       updateEnemies();
       updateBullets();
       renderer.render(scene, camera);
