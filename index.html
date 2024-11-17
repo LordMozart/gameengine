@@ -79,16 +79,20 @@
 
       right.crossVectors(forward, camera.up).normalize(); // Fixed right vector
 
-      if (keys['w']) camera.position.addScaledVector(forward, playerSpeed);
-      if (keys['s']) camera.position.addScaledVector(forward, -playerSpeed);
-      if (keys['a']) camera.position.addScaledVector(right, -playerSpeed);
-      if (keys['d']) camera.position.addScaledVector(right, playerSpeed);
+      const newPosition = camera.position.clone();
+
+      if (keys['w']) newPosition.addScaledVector(forward, playerSpeed);
+      if (keys['s']) newPosition.addScaledVector(forward, -playerSpeed);
+      if (keys['a']) newPosition.addScaledVector(right, -playerSpeed);
+      if (keys['d']) newPosition.addScaledVector(right, playerSpeed);
 
       // Keep player within boundaries
-      camera.position.clamp(
+      newPosition.clamp(
         new THREE.Vector3(-50, 1, -50),
         new THREE.Vector3(50, 10, 50)
       );
+
+      camera.position.copy(newPosition); // Apply new position after boundary check
     }
 
     // Skybox setup
@@ -102,6 +106,20 @@
       './textures/garfield_nz.png', // Back
     ]);
     scene.background = skyboxTexture;
+
+    // Add boxes around the map
+    const boxTexture = new THREE.TextureLoader().load('./textures/box_texture.png');
+    for (let i = 0; i < 10; i++) {
+      const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
+      const box = new THREE.Mesh(boxGeometry, boxMaterial);
+      box.position.set(
+        Math.random() * 80 - 40,
+        1,
+        Math.random() * 80 - 40
+      );
+      scene.add(box);
+    }
 
     // Enemy management
     const enemies = [];
