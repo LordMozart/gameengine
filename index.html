@@ -1,202 +1,275 @@
-<html><head><base href="." /><meta charset="UTF-8"><title>Top Down 3D Shooter</title><style>
-body { 
-    margin: 0;
-    overflow: hidden;
-    font-family: Arial, sans-serif;
-    background: #000;
-}
-#gameCanvas {
-    width: 100vw;
-    height: 100vh;
-}
-#hud {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    color: #fff;
-    font-size: 24px;
-    text-shadow: 2px 2px 2px #000;
-}
-#healthBar {
-    width: 200px;
-    height: 20px;
-    background: #333;
-    margin-top: 10px;
-}
-#health {
-    width: 100%;
-    height: 100%;
-    background: #ff3333;
-    transition: width 0.3s;
-}
-</style></head><body>
-<div id="hud">
+<html>
+<head>
+  <base href="." />
+  <meta charset="UTF-8">
+  <title>Top Down 3D Shooter</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #000;
+    }
+    #gameCanvas {
+      width: 100vw;
+      height: 100vh;
+    }
+    #hud {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      color: #fff;
+      font-size: 24px;
+      text-shadow: 2px 2px 2px #000;
+    }
+    #healthBar {
+      width: 200px;
+      height: 20px;
+      background: #333;
+      margin-top: 10px;
+    }
+    #health {
+      width: 100%;
+      height: 100%;
+      background: #ff3333;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
     Score: <span id="score">0</span>
     <div id="healthBar"><div id="health"></div></div>
-</div>
-<canvas id="gameCanvas"></canvas>
+  </div>
+  <canvas id="gameCanvas"></canvas>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({
-    canvas: document.getElementById('gameCanvas'),
-    antialias: true
-});
-renderer.setSize(window.innerWidth, window.innerHeight);
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({
+      canvas: document.getElementById('gameCanvas'),
+      antialias: true
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0x404040);
-scene.add(ambientLight);
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(5, 5, 5);
-scene.add(directionalLight);
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x404040);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
 
-// Player
-const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
-const playerMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00});
-const player = new THREE.Mesh(playerGeometry, playerMaterial);
-player.position.y = 0.5;
-scene.add(player);
+    // Player
+    const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const playerMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00});
+    const player = new THREE.Mesh(playerGeometry, playerMaterial);
+    player.position.y = 0.5;
+    scene.add(player);
 
-// Floor
-const floorGeometry = new THREE.PlaneGeometry(50, 50);
-const floorMaterial = new THREE.MeshPhongMaterial({color: 0x808080, side: THREE.DoubleSide});
-const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-floor.rotation.x = Math.PI / 2;
-scene.add(floor);
+    // Floor
+    const floorGeometry = new THREE.PlaneGeometry(50, 50);
+    const floorMaterial = new THREE.MeshPhongMaterial({color: 0x808080, side: THREE.DoubleSide});
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = Math.PI / 2;
+    scene.add(floor);
 
-// Game state
-let score = 0;
-let health = 100;
-let enemies = [];
-const enemySpeed = 0.05;
-camera.position.set(0, 20, 0);
-camera.lookAt(0, 0, 0);
+    // Game state
+    let score = 0;
+    let health = 100;
+    let enemies = [];
+    let upgrades = [];
+    const enemySpeed = 0.05;
+    const projectileSpeed = 0.5;
+    camera.position.set(0, 20, 0);
+    camera.lookAt(0, 0, 0);
 
-// Enemy creation
-function createEnemy() {
-    const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
-    const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-    
-    // Random position on the edge of the floor
-    const side = Math.floor(Math.random() * 4);
-    switch(side) {
+    // Enemy creation
+    function createEnemy(type) {
+      const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+      const enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
+      const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+      
+      // Random position on the edge of the floor
+      const side = Math.floor(Math.random() * 4);
+      switch(side) {
         case 0: enemy.position.set(-25, 0.5, Math.random() * 50 - 25); break;
         case 1: enemy.position.set(25, 0.5, Math.random() * 50 - 25); break;
         case 2: enemy.position.set(Math.random() * 50 - 25, 0.5, -25); break;
         case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
+      }
+      
+      enemy.type = type; // 'melee' or 'ranged'
+      scene.add(enemy);
+      enemies.push(enemy);
     }
-    
-    scene.add(enemy);
-    enemies.push(enemy);
-}
 
-// Projectiles
-let projectiles = [];
-function shoot(direction) {
-    const projectileGeometry = new THREE.SphereGeometry(0.2);
-    const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
-    const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-    projectile.position.copy(player.position);
-    projectile.velocity = direction.normalize().multiplyScalar(0.5);
-    scene.add(projectile);
-    projectiles.push(projectile);
-}
+    // Ranged Enemy behavior (shooting)
+    function createEnemyProjectile(enemy) {
+      const projectileGeometry = new THREE.SphereGeometry(0.2);
+      const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
+      const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+      projectile.position.copy(enemy.position);
+      
+      const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+      projectile.velocity = direction.multiplyScalar(projectileSpeed);
+      scene.add(projectile);
+      enemy.projectiles = enemy.projectiles || [];
+      enemy.projectiles.push(projectile);
+    }
 
-// Input handling
-const keys = {};
-window.addEventListener('keydown', (e) => keys[e.key] = true);
-window.addEventListener('keyup', (e) => keys[e.key] = false);
-window.addEventListener('mousemove', (e) => {
-    const vector = new THREE.Vector3(
+    // Player's projectile
+    let projectiles = [];
+    function shoot(direction) {
+      const projectileGeometry = new THREE.SphereGeometry(0.2);
+      const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
+      const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+      projectile.position.copy(player.position);
+      projectile.velocity = direction.normalize().multiplyScalar(projectileSpeed);
+      scene.add(projectile);
+      projectiles.push(projectile);
+    }
+
+    // Upgrades
+    function createUpgrade() {
+      const upgradeGeometry = new THREE.SphereGeometry(0.5);
+      const upgradeMaterial = new THREE.MeshPhongMaterial({color: 0x00ffff});
+      const upgrade = new THREE.Mesh(upgradeGeometry, upgradeMaterial);
+      upgrade.position.set(Math.random() * 50 - 25, 0.5, Math.random() * 50 - 25);
+      scene.add(upgrade);
+      upgrades.push(upgrade);
+    }
+
+    // Collision with upgrades
+    function checkUpgradeCollision() {
+      upgrades.forEach((upgrade, index) => {
+        if (upgrade.position.distanceTo(player.position) < 1) {
+          health = Math.min(100, health + 20);  // Heal player on upgrade
+          document.getElementById('health').style.width = health + '%';
+          scene.remove(upgrade);
+          upgrades.splice(index, 1);
+        }
+      });
+    }
+
+    // Input handling
+    const keys = {};
+    window.addEventListener('keydown', (e) => keys[e.key] = true);
+    window.addEventListener('keyup', (e) => keys[e.key] = false);
+    window.addEventListener('mousemove', (e) => {
+      const vector = new THREE.Vector3(
         (e.clientX / window.innerWidth) * 2 - 1,
         -(e.clientY / window.innerHeight) * 2 + 1,
         0
-    );
-    vector.unproject(camera);
-    const dir = vector.sub(camera.position).normalize();
-    const distance = -camera.position.y / dir.y;
-    const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-    player.lookAt(pos.x, player.position.y, pos.z);
-});
-
-window.addEventListener('click', () => {
-    const direction = new THREE.Vector3();
-    player.getWorldDirection(direction);
-    shoot(direction);
-});
-
-// Game loop
-let lastEnemySpawn = 0;
-function animate() {
-    requestAnimationFrame(animate);
-
-    // Player movement
-    if (keys['w']) player.position.z -= 0.2;
-    if (keys['s']) player.position.z += 0.2;
-    if (keys['a']) player.position.x -= 0.2;
-    if (keys['d']) player.position.x += 0.2;
-
-    // Spawn enemies
-    if (Date.now() - lastEnemySpawn > 2000) {
-        createEnemy();
-        lastEnemySpawn = Date.now();
-    }
-
-    // Update enemies
-    enemies.forEach(enemy => {
-        const direction = new THREE.Vector3()
-            .subVectors(player.position, enemy.position)
-            .normalize();
-        enemy.position.add(direction.multiplyScalar(enemySpeed));
-        
-        // Check collision with player
-        if (enemy.position.distanceTo(player.position) < 1) {
-            health -= 10;
-            document.getElementById('health').style.width = health + '%';
-            if (health <= 0) {
-                alert('Game Over! Score: ' + score);
-                location.reload();
-            }
-        }
+      );
+      vector.unproject(camera);
+      const dir = vector.sub(camera.position).normalize();
+      const distance = -camera.position.y / dir.y;
+      const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+      player.lookAt(pos.x, player.position.y, pos.z);
     });
 
-    // Update projectiles
-    projectiles.forEach((projectile, index) => {
+    window.addEventListener('click', () => {
+      const direction = new THREE.Vector3();
+      player.getWorldDirection(direction);
+      shoot(direction);
+    });
+
+    // Game loop
+    let lastEnemySpawn = 0;
+    let lastUpgradeSpawn = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Player movement
+      if (keys['w']) player.position.z -= 0.2;
+      if (keys['s']) player.position.z += 0.2;
+      if (keys['a']) player.position.x -= 0.2;
+      if (keys['d']) player.position.x += 0.2;
+
+      // Spawn enemies
+      if (Date.now() - lastEnemySpawn > 2000) {
+        const type = Math.random() < 0.5 ? 'melee' : 'ranged';
+        createEnemy(type);
+        lastEnemySpawn = Date.now();
+      }
+
+      // Spawn upgrades
+      if (Date.now() - lastUpgradeSpawn > 5000) {
+        createUpgrade();
+        lastUpgradeSpawn = Date.now();
+      }
+
+      // Update enemies
+      enemies.forEach(enemy => {
+        if (enemy.type === 'ranged' && Math.random() < 0.01) {
+          createEnemyProjectile(enemy);
+        }
+
+        const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+        enemy.position.add(direction.multiplyScalar(enemySpeed));
+
+        // Check collision with player
+        if (enemy.position.distanceTo(player.position) < 1) {
+          health -= 10;
+          document.getElementById('health').style.width = health + '%';
+          if (health <= 0) {
+            alert('Game Over! Score: ' + score);
+            location.reload();
+          }
+        }
+      });
+
+      // Update projectiles
+      projectiles.forEach((projectile, index) => {
         projectile.position.add(projectile.velocity);
         
         // Remove projectiles that go too far
         if (projectile.position.length() > 50) {
-            scene.remove(projectile);
-            projectiles.splice(index, 1);
+          scene.remove(projectile);
+          projectiles.splice(index, 1);
         }
 
         // Check collision with enemies
         enemies.forEach((enemy, enemyIndex) => {
-            if (projectile.position.distanceTo(enemy.position) < 1) {
-                scene.remove(enemy);
-                scene.remove(projectile);
-                enemies.splice(enemyIndex, 1);
-                projectiles.splice(index, 1);
-                score += 100;
-                document.getElementById('score').textContent = score;
-            }
+          if (projectile.position.distanceTo(enemy.position) < 1) {
+            scene.remove(enemy);
+            scene.remove(projectile);
+            enemies.splice(enemyIndex, 1);
+            projectiles.splice(index, 1);
+            score += 100;
+            document.getElementById('score').textContent = score;
+          }
         });
+      });
+
+      // Update enemy projectiles
+      enemies.forEach(enemy => {
+        if (enemy.projectiles) {
+          enemy.projectiles.forEach((projectile, index) => {
+            projectile.position.add(projectile.velocity);
+            if (projectile.position.distanceTo(player.position) < 1) {
+              health -= 5;
+              document.getElementById('health').style.width = health + '%';
+              scene.remove(projectile);
+              enemy.projectiles.splice(index, 1);
+            }
+          });
+        }
+      });
+
+      checkUpgradeCollision();
+      renderer.render(scene, camera);
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    renderer.render(scene, camera);
-}
-
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-animate();
-</script>
-</body></html>
+    animate();
+  </script>
+</body>
+</html>
