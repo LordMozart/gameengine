@@ -54,6 +54,38 @@
             height: 100%;
             background: #ff3333;
         }
+        #upgradePanel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+            transition: all 0.5s ease-in-out;
+        }
+        #upgradeButton {
+            position: fixed;
+            bottom: 120px;
+            left: 20px;
+            background: #00ff00;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #upgradeText {
+            color: white;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        #multiShotUpgrade {
+            background: #ff6600;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -62,6 +94,16 @@
     <div id="healthBar"><div id="health"></div></div>
 </div>
 <div id="killCount">Kills: <span id="killCountValue">0</span></div>
+
+<!-- Upgrade Panel -->
+<div id="upgradePanel">
+    <div id="upgradeText">Upgrades:</div>
+    <div id="multiShotUpgrade">Buy Multi Shot ($10,000)</div>
+</div>
+
+<!-- Upgrade Button -->
+<div id="upgradeButton">Upgrade</div>
+
 <canvas id="gameCanvas"></canvas>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -202,30 +244,46 @@
     window.addEventListener('click', () => {
         const direction = new THREE.Vector3();
         player.getWorldDirection(direction);
-        if (money >= 10000 && !upgradeBought) {
-            upgradeBought = true;
-            shoot(direction);
-            shoot(direction);  // Multi-shot upgrade
+        shoot(direction);
+    });
+
+    // Upgrade panel animation
+    const upgradeButton = document.getElementById('upgradeButton');
+    const upgradePanel = document.getElementById('upgradePanel');
+    
+    upgradeButton.addEventListener('click', () => {
+        if (upgradePanel.style.display === "none") {
+            upgradePanel.style.display = "block";
         } else {
-            shoot(direction);
+            upgradePanel.style.display = "none";
+        }
+    });
+
+    // Upgrade purchase
+    document.getElementById('multiShotUpgrade').addEventListener('click', () => {
+        if (money >= 10000 && !upgradeBought) {
+            money -= 10000;
+            upgradeBought = true;
+            // Implement multi-shot functionality here
+            alert("Multi-shot Upgrade Purchased!");
+        } else {
+            alert("Not enough money or upgrade already bought!");
         }
     });
 
     // Game loop
-    let lastEnemySpawn = 0;
     function animate() {
         requestAnimationFrame(animate);
 
-        // Player movement with boundaries
-        if (keys['w'] && player.position.z > -24) player.position.z -= 0.2;
-        if (keys['s'] && player.position.z < 24) player.position.z += 0.2;
-        if (keys['a'] && player.position.x > -24) player.position.x -= 0.2;
-        if (keys['d'] && player.position.x < 24) player.position.x += 0.2;
+        // Player movement
+        if (keys['w']) player.position.z -= 0.2;
+        if (keys['s']) player.position.z += 0.2;
+        if (keys['a']) player.position.x -= 0.2;
+        if (keys['d']) player.position.x += 0.2;
 
         // Spawn enemies
-        if (Date.now() - lastEnemySpawn > 2000) {
+        if (Date.now() % 2000 === 0) {
             createEnemy();
-            lastEnemySpawn = Date.now();
         }
 
         // Update enemies and their health
