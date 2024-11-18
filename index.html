@@ -54,64 +54,6 @@
             height: 100%;
             background: #ff3333;
         }
-        /* Pause and upgrade menu styles */
-        #pauseMenu {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            font-size: 36px;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            z-index: 100;
-        }
-        #upgradeMenu {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            font-size: 36px;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            z-index: 101;
-        }
-        .blur {
-            filter: blur(5px);
-        }
-        #blurBackground {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: #000;
-            z-index: 99;
-            display: none;
-            filter: blur(5px);
-        }
-        .upgradeButton {
-            background-color: #333;
-            color: white;
-            padding: 20px;
-            font-size: 24px;
-            margin: 10px;
-            border: none;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .upgradeButton:hover {
-            background-color: #555;
-        }
     </style>
 </head>
 <body>
@@ -121,20 +63,6 @@
 </div>
 <div id="killCount">Kills: <span id="killCountValue">0</span></div>
 <canvas id="gameCanvas"></canvas>
-
-<div id="pauseMenu">
-    <p>Game Paused</p>
-    <p>Press 'P' to resume</p>
-</div>
-
-<div id="upgradeMenu">
-    <p>Upgrade Menu</p>
-    <button class="upgradeButton" id="upgradeHealthButton">Upgrade Health (5000)</button>
-    <button class="upgradeButton" id="upgradeSpeedButton">Upgrade Speed (5000)</button>
-    <button class="upgradeButton" id="closeUpgradeMenuButton">Close Menu</button>
-</div>
-
-<div id="blurBackground"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -164,17 +92,35 @@
     player.castShadow = true;
     scene.add(player);
 
+    // Floor with garfield.png texture
+    const loader = new THREE.TextureLoader();
+    const floorTexture = loader.load('garfield.png');
+    const floorGeometry = new THREE.PlaneGeometry(50, 50);
+    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture, side: THREE.DoubleSide });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Boundaries
+    const boundary = new THREE.BoxGeometry(50, 1, 50);
+    const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+    const boundaryMesh = new THREE.Mesh(boundary, boundaryMaterial);
+    boundaryMesh.position.set(0, 0.5, 0);
+    scene.add(boundaryMesh);
+
     // Game state
     let score = 0;
     let kills = 0;
     let health = 100;
     let money = 0;
     let enemies = [];
+    let upgradeBought = false;
     let projectiles = [];
-    let isPaused = false;
-    let upgradeHealth = 0;
-    let upgradeSpeed = 0.2;
-    let lastEnemySpawn = 0; 
+    const enemySpeed = 0.05;
+    const rangedEnemyChance = 0.5;
+    camera.position.set(0, 20, 0);
+    camera.lookAt(0, 0, 0);
 
     // Enemy creation
     function createEnemy() {
@@ -194,8 +140,28 @@
             case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
         }
 
+        const isRanged = Math.random() < rangedEnemyChance;
+        enemy.isRanged = isRanged;
+
+        // Health bar for enemies
+        const healthBar = document.createElement('div');
+        healthBar.classList.add('enemyHealthBar');
+        document.body.appendChild(healthBar);
+        enemy.health = 100;
+        enemy.healthBar = healthBar;
+
         scene.add(enemy);
         enemies.push(enemy);
+
+        // Add shooting for ranged enemies
+        if (isRanged) {
+            enemy.shootInterval = setInterval(() => {
+                if (enemy.isRanged) {
+                    const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+                    shoot(direction, enemy.position);
+                }
+            }, 2000); // 2 seconds cooldown
+        }
     }
 
     // Shooting mechanism
@@ -214,76 +180,41 @@
     const keys = {};
     window.addEventListener('keydown', (e) => keys[e.key] = true);
     window.addEventListener('keyup', (e) => keys[e.key] = false);
+    window.addEventListener('mousemove', (e) => {
+        const vector = new THREE.Vector3(
+            (e.clientX / window.innerWidth) * 2 - 1,
+            -(e.clientY / window.innerHeight) * 2 + 1,
+            0
+        );
+        vector.unproject(camera);
+        const dir = vector.sub(camera.position).normalize();
+        const distance = -camera.position.y / dir.y;
+        const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+        player.lookAt(pos.x, player.position.y, pos.z);
+    });
 
     window.addEventListener('click', () => {
         const direction = new THREE.Vector3();
         player.getWorldDirection(direction);
-        shoot(direction);
-    });
-
-    // Pause menu logic
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'p' || e.key === 'P') {
-            isPaused = !isPaused;
-            if (isPaused) {
-                document.getElementById('pauseMenu').style.display = 'flex';
-                document.getElementById('blurBackground').style.display = 'block';
-                document.body.classList.add('blur');
-            } else {
-                document.getElementById('pauseMenu').style.display = 'none';
-                document.getElementById('blurBackground').style.display = 'none';
-                document.body.classList.remove('blur');
-            }
-        }
-    });
-
-    // Upgrade menu
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'u' || e.key === 'U') {
-            document.getElementById('upgradeMenu').style.display = 'flex';
-            document.getElementById('pauseMenu').style.display = 'none';
-            document.getElementById('blurBackground').style.display = 'block';
-        }
-    });
-
-    // Close upgrade menu
-    document.getElementById('closeUpgradeMenuButton').addEventListener('click', () => {
-        document.getElementById('upgradeMenu').style.display = 'none';
-        document.getElementById('pauseMenu').style.display = 'flex';
-        document.getElementById('blurBackground').style.display = 'none';
-    });
-
-    // Upgrade buttons
-    document.getElementById('upgradeHealthButton').addEventListener('click', () => {
-        if (money >= 5000) {
-            health += 20;
-            money -= 5000;
-            document.getElementById('health').style.width = health + '%';
-        }
-    });
-
-    document.getElementById('upgradeSpeedButton').addEventListener('click', () => {
-        if (money >= 5000) {
-            upgradeSpeed += 0.1;
-            money -= 5000;
+        if (money >= 10000 && !upgradeBought) {
+            upgradeBought = true;
+            shoot(direction);
+            shoot(direction);  // Multi-shot upgrade
+        } else {
+            shoot(direction);
         }
     });
 
     // Game loop
+    let lastEnemySpawn = 0;
     function animate() {
-        if (isPaused) return;
-
         requestAnimationFrame(animate);
 
-        // Update camera for top-down view
-        camera.position.set(0, 30, 0); // Above the player
-        camera.lookAt(player.position); // Looking down at the player
-
         // Player movement with boundaries
-        if (keys['w'] && player.position.z > -24) player.position.z -= upgradeSpeed;
-        if (keys['s'] && player.position.z < 24) player.position.z += upgradeSpeed;
-        if (keys['a'] && player.position.x > -24) player.position.x -= upgradeSpeed;
-        if (keys['d'] && player.position.x < 24) player.position.x += upgradeSpeed;
+        if (keys['w'] && player.position.z > -24) player.position.z -= 0.2;
+        if (keys['s'] && player.position.z < 24) player.position.z += 0.2;
+        if (keys['a'] && player.position.x > -24) player.position.x -= 0.2;
+        if (keys['d'] && player.position.x < 24) player.position.x += 0.2;
 
         // Spawn enemies
         if (Date.now() - lastEnemySpawn > 2000) {
@@ -293,8 +224,15 @@
 
         // Update enemies
         enemies.forEach(enemy => {
-            const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-            enemy.position.add(direction.multiplyScalar(0.05));
+            const direction = new THREE.Vector3()
+                .subVectors(player.position, enemy.position)
+                .normalize();
+            enemy.position.add(direction.multiplyScalar(enemySpeed));
+
+            // Update enemy health bar
+            if (enemy.healthBar) {
+                enemy.healthBar.style.width = ${(enemy.health / 100) * 40}px;
+            }
 
             // Check collision with player
             if (enemy.position.distanceTo(player.position) < 1) {
@@ -310,10 +248,40 @@
         // Update projectiles
         projectiles.forEach((projectile, index) => {
             projectile.position.add(projectile.velocity);
+
+            // Remove projectiles that go too far
+            if (projectile.position.length() > 50) {
+                scene.remove(projectile);
+                projectiles.splice(index, 1);
+            }
+
+            // Check collision with enemies
+            enemies.forEach((enemy, enemyIndex) => {
+                if (projectile.position.distanceTo(enemy.position) < 1) {
+                    enemy.health -= 20;
+                    if (enemy.health <= 0) {
+                        kills++;
+                        document.getElementById('killCountValue').textContent = kills;
+                        scene.remove(enemy);
+                        scene.remove(projectile);
+                        enemies.splice(enemyIndex, 1);
+                        projectiles.splice(index, 1);
+                        money += 500;
+                    }
+                }
+            });
         });
 
+        // Render the scene
         renderer.render(scene, camera);
     }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 
     animate();
 </script>
