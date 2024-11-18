@@ -5,11 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D FPS Game</title>
     <style>
-        body, html { margin: 0; padding: 0; overflow: hidden; height: 100%; }
+        body, html { margin: 0; padding: 0; overflow: hidden; height: 100%; background-color: #000; }
         canvas { display: block; }
-        .hud { position: absolute; top: 10px; left: 10px; color: white; font-family: Arial, sans-serif; font-size: 18px; }
-        .hud span { display: block; }
-        #reload { font-size: 16px; color: #ff0000; }
+        .hud {
+            position: absolute; top: 10px; left: 10px; color: white; font-family: Arial, sans-serif; font-size: 18px;
+        }
+        #ammo, #score, #health, #reload {
+            display: block;
+        }
+        #reload { font-size: 16px; color: red; }
     </style>
 </head>
 <body>
@@ -26,8 +30,9 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        // Player and game variables
-        let player = { x: 200, y: 200, z: 100, pitch: 0, yaw: 0, health: 100, ammo: 10, speed: 2, jump: false, jumpHeight: 0 };
+        let player = {
+            x: 200, y: 200, z: 100, pitch: 0, yaw: 0, health: 100, ammo: 10, speed: 2, jump: false, jumpHeight: 0
+        };
         let bullets = [];
         let enemies = [{ x: 600, y: 200, z: 100, health: 50 }];
         let score = 0;
@@ -37,14 +42,12 @@
             { x: 0, y: 200, z: 300, w: 10, h: 500, d: 500 }, // Left wall
             { x: 800, y: 200, z: 300, w: 10, h: 500, d: 500 }, // Right wall
             { x: 400, y: 200, z: 0, w: 500, h: 500, d: 10 }, // Front wall
-            { x: 400, y: 200, z: 600, w: 500, h: 500, d: 10 }, // Back wall
+            { x: 400, y: 200, z: 600, w: 500, h: 500, d: 10 }  // Back wall
         ];
 
-        // Game settings
         const gravity = 0.05;
         const maxJumpHeight = 50;
 
-        // Key and mouse controls
         let keys = { w: false, a: false, s: false, d: false, space: false, r: false };
         window.addEventListener('keydown', (e) => { keys[e.key] = true; });
         window.addEventListener('keyup', (e) => { keys[e.key] = false; });
@@ -55,13 +58,9 @@
             mouseY = e.clientY;
         });
 
-        // Bullet and shooting mechanics
         canvas.addEventListener('click', () => {
-            if (player.ammo > 0) {
-                fireBullet();
-            } else {
-                alert('Out of ammo! Press "R" to reload.');
-            }
+            if (player.ammo > 0) fireBullet();
+            else alert('Out of ammo! Press "R" to reload.');
         });
 
         function fireBullet() {
@@ -78,14 +77,12 @@
             updateHUD();
         }
 
-        // Update ammo counter
         function updateHUD() {
             document.getElementById('ammo').textContent = `Ammo: ${player.ammo}`;
             document.getElementById('score').textContent = `Score: ${score}`;
             document.getElementById('health').textContent = `Health: ${player.health}`;
         }
 
-        // Reload function
         function reload() {
             if (keys.r) {
                 player.ammo = 10;
@@ -93,7 +90,6 @@
             }
         }
 
-        // Move player based on WASD and jumping
         function movePlayer() {
             if (keys.w) { player.x += Math.sin(player.yaw) * player.speed; player.z -= Math.cos(player.yaw) * player.speed; }
             if (keys.s) { player.x -= Math.sin(player.yaw) * player.speed; player.z += Math.cos(player.yaw) * player.speed; }
@@ -106,12 +102,11 @@
             }
         }
 
-        // Update player's jump (gravity effect)
         function handleJump() {
             if (player.jump) {
                 player.y += player.jumpHeight;
                 player.jumpHeight -= gravity;
-                if (player.y <= 200) {  // Reset when reaching the ground
+                if (player.y <= 200) {
                     player.y = 200;
                     player.jump = false;
                     player.jumpHeight = 0;
@@ -119,27 +114,25 @@
             }
         }
 
-        // Check bullet collisions
         function checkCollisions() {
             bullets.forEach((bullet, index) => {
                 enemies.forEach((enemy, enemyIndex) => {
                     let distance = Math.sqrt(Math.pow(bullet.x - enemy.x, 2) + Math.pow(bullet.y - enemy.y, 2) + Math.pow(bullet.z - enemy.z, 2));
                     if (distance < 10) {
                         score++;
-                        enemies.splice(enemyIndex, 1);  // Remove enemy
-                        bullets.splice(index, 1);  // Remove bullet
+                        enemies.splice(enemyIndex, 1);
+                        bullets.splice(index, 1);
                     }
                 });
 
                 walls.forEach(wall => {
                     if (bullet.x > wall.x && bullet.x < wall.x + wall.w && bullet.y > wall.y && bullet.y < wall.y + wall.h && bullet.z > wall.z && bullet.z < wall.z + wall.d) {
-                        bullets.splice(index, 1);  // Remove bullet when hitting wall
+                        bullets.splice(index, 1);
                     }
                 });
             });
         }
 
-        // Move bullets
         function moveBullets() {
             bullets.forEach(bullet => {
                 bullet.x += bullet.dx * bullet.speed;
@@ -148,15 +141,13 @@
             });
         }
 
-        // Render environment (walls and floor)
         function renderWalls() {
             walls.forEach(wall => {
                 ctx.fillStyle = '#999';
-                ctx.fillRect(wall.x, wall.z, wall.w, wall.d);  // Basic 2D projection for simplicity
+                ctx.fillRect(wall.x, wall.z, wall.w, wall.d);
             });
         }
 
-        // Render enemies
         function renderEnemies() {
             enemies.forEach(enemy => {
                 ctx.beginPath();
@@ -166,31 +157,22 @@
             });
         }
 
-        // Handle game update loop
         function update() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Update player movement
             movePlayer();
             handleJump();
             reload();
 
-            // Move and check bullets
             moveBullets();
             checkCollisions();
 
-            // Render the game world
             renderWalls();
             renderEnemies();
 
-            // Update the HUD
             updateHUD();
-
-            // Continue the game loop
             requestAnimationFrame(update);
         }
 
-        // Start game
         update();
     </script>
 </body>
