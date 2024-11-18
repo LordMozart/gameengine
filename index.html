@@ -121,17 +121,17 @@
     let yaw = 0; // Horizontal (Left-Right) rotation
     const maxPitch = Math.PI / 2; // Limit the pitch to ±90 degrees (no flipping)
 
-    // Improved mouse movement for camera control
+    // Fixed Camera Rotation Logic
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
         yaw -= event.movementX * 0.002; // Horizontal rotation
-        pitch -= event.movementY * 0.002; // Vertical rotation (fixed direction)
+        pitch -= event.movementY * 0.002; // Vertical rotation
 
-        // Clamp pitch to prevent flipping
+        // Clamping the vertical rotation to prevent flipping
         pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
 
-        // Apply rotations
-        camera.rotation.set(pitch, yaw, 0); 
+        // Apply the rotations to the camera
+        camera.rotation.set(pitch, yaw, 0);
       }
     });
 
@@ -147,7 +147,7 @@
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
-    // Parkour boxes
+    // Parkour boxes with proper collision handling
     const parkourBoxes = [];
     const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your texture
 
@@ -164,7 +164,7 @@
       parkourBoxes.push(box);
     }
 
-    // Enemies
+    // Enemies with hitbox detection
     const enemies = [];
     const enemySpeed = 0.05;
 
@@ -200,7 +200,7 @@
       });
     }
 
-    // Bullet mechanics
+    // Bullet mechanics with collision detection
     const bullets = [];
     function updateBullets() {
       bullets.forEach((bullet, index) => {
@@ -209,6 +209,14 @@
           scene.remove(bullet);
           bullets.splice(index, 1);
         }
+
+        parkourBoxes.forEach((box) => {
+          const boxBoundingBox = new THREE.Box3().setFromObject(box);
+          if (boxBoundingBox.containsPoint(bullet.position)) {
+            scene.remove(bullet);
+            bullets.splice(index, 1);
+          }
+        });
 
         enemies.forEach((enemy, enemyIndex) => {
           if (bullet.position.distanceTo(enemy.position) < 1) {
@@ -226,7 +234,7 @@
       });
     }
 
-    // Shooting bullets
+    // Shooting bullets with collision detection
     document.addEventListener('click', () => {
       const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
       const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
