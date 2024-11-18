@@ -57,9 +57,7 @@
 
     const playerSpeed = 0.1;
     const jumpSpeed = 0.3;
-
-    // Camera height (now doubled)
-    const cameraHeight = 2;  // Changed from 1 to 2 for 200px equivalent height
+    const cameraHeight = 2;
 
     // Handle player movement
     function handlePlayerMovement() {
@@ -121,55 +119,51 @@
 
     let pitch = 0; // Vertical (Up-Down) rotation
     let yaw = 0; // Horizontal (Left-Right) rotation
-
     const maxPitch = Math.PI / 2; // Limit the pitch to ±90 degrees (no flipping)
 
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
-        // Adjust the yaw (left-right) for horizontal mouse movement
-        yaw -= event.movementX * 0.002;
+        yaw -= event.movementX * 0.002;  // Horizontal rotation
+        pitch -= event.movementY * 0.002; // Vertical rotation (fixed direction)
 
-        // Adjust the pitch (up-down) for vertical mouse movement
-        pitch -= event.movementY * 0.002;
-
-        // Limit the pitch (up-down) to prevent the camera from rotating too far
+        // Clamp pitch to prevent flipping
         pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
 
-        // Apply the rotations
-        camera.rotation.set(pitch, yaw, 0);  // pitch for up-down, yaw for left-right
+        // Apply rotations
+        camera.rotation.set(pitch, yaw, 0); 
       }
     });
 
-    // Set Garfield texture as the background instead of skybox
-    const garfieldTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with the image path
+    // Add Garfield texture as the background
+    const garfieldTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your image path
     scene.background = garfieldTexture;
 
     // Add ground texture
     const floorGeometry = new THREE.PlaneGeometry(200, 200);
-    const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your ground texture image
+    const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your texture
     const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = - Math.PI / 2;
+    floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
-    // Parkour Box setup with random sizes and positions
+    // Parkour boxes
     const parkourBoxes = [];
-    const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your box image
+    const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your texture
 
     for (let i = 0; i < 10; i++) {
-      const boxGeometry = new THREE.BoxGeometry(Math.random() * 5 + 1, Math.random() * 3 + 1, Math.random() * 5 + 1); // Random size
+      const boxGeometry = new THREE.BoxGeometry(Math.random() * 5 + 1, Math.random() * 3 + 1, Math.random() * 5 + 1);
       const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
       const box = new THREE.Mesh(boxGeometry, boxMaterial);
       box.position.set(
         Math.random() * 80 - 40,
-        Math.random() * 5 + 1, // Ensure they float above the ground
+        Math.random() * 5 + 1,
         Math.random() * 80 - 40
       );
       scene.add(box);
       parkourBoxes.push(box);
     }
 
-    // Enemy management
+    // Enemies
     const enemies = [];
     const enemySpeed = 0.05;
 
@@ -187,7 +181,7 @@
       scene.add(enemy);
     }
 
-    setInterval(spawnEnemy, 3000); // Spawn an enemy every 3 seconds
+    setInterval(spawnEnemy, 3000);
 
     function updateEnemies() {
       enemies.forEach((enemy, index) => {
@@ -205,32 +199,18 @@
       });
     }
 
-    // Bullet management
+    // Bullets
     const bullets = [];
     function updateBullets() {
       bullets.forEach((bullet, index) => {
         bullet.position.add(bullet.velocity);
-
-        // Remove bullets after 50 units or when they hit a box or enemy
         if (bullet.position.distanceTo(bullet.startPosition) > 50) {
           scene.remove(bullet);
           bullets.splice(index, 1);
         }
 
-        // Check for collisions with parkour boxes
-        parkourBoxes.forEach((box, boxIndex) => {
-          const boxBoundingBox = new THREE.Box3().setFromObject(box);
-          if (boxBoundingBox.containsPoint(bullet.position)) {
-            // Bullet hits the box
-            scene.remove(bullet);
-            bullets.splice(index, 1);
-          }
-        });
-
-        // Check for collisions with enemies
         enemies.forEach((enemy, enemyIndex) => {
           if (bullet.position.distanceTo(enemy.position) < 1) {
-            // Bullet hits the enemy
             enemy.health -= 25;
             if (enemy.health <= 0) {
               scene.remove(enemy);
@@ -245,15 +225,7 @@
       });
     }
 
-    // Shooting with cooldown
-    let canShoot = true;
-
     document.addEventListener('click', () => {
-      if (!canShoot) return;
-
-      canShoot = false;
-      setTimeout(() => canShoot = true, 200); // 0.2-second cooldown
-
       const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
       const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
       const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
@@ -266,7 +238,6 @@
       scene.add(bullet);
     });
 
-    // Game Loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
