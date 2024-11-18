@@ -121,9 +121,10 @@
     let yaw = 0; // Horizontal (Left-Right) rotation
     const maxPitch = Math.PI / 2; // Limit the pitch to ±90 degrees (no flipping)
 
+    // Improved mouse movement for camera control
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement === document.body) {
-        yaw -= event.movementX * 0.002;  // Horizontal rotation
+        yaw -= event.movementX * 0.002; // Horizontal rotation
         pitch -= event.movementY * 0.002; // Vertical rotation (fixed direction)
 
         // Clamp pitch to prevent flipping
@@ -199,7 +200,7 @@
       });
     }
 
-    // Bullets
+    // Bullet mechanics
     const bullets = [];
     function updateBullets() {
       bullets.forEach((bullet, index) => {
@@ -225,6 +226,7 @@
       });
     }
 
+    // Shooting bullets
     document.addEventListener('click', () => {
       const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
       const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
@@ -238,6 +240,7 @@
       scene.add(bullet);
     });
 
+    // Game loop
     function animate() {
       requestAnimationFrame(animate);
       handlePlayerMovement();
