@@ -1,151 +1,179 @@
 <html>
 <head>
-  <base href="." />
-  <meta charset="UTF-8">
-  <title>Top Down 3D Shooter with Shadows and Image Textures</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
-      background: #000;
-    }
-    #gameCanvas {
-      width: 100vw;
-      height: 100vh;
-    }
-    #hud {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      color: #fff;
-      font-size: 24px;
-      text-shadow: 2px 2px 2px #000;
-    }
-    #healthBar {
-      width: 200px;
-      height: 20px;
-      background: #333;
-      margin-top: 10px;
-    }
-    #health {
-      width: 100%;
-      height: 100%;
-      background: #ff3333;
-      transition: width 0.3s;
-    }
-  </style>
+    <base href="." />
+    <meta charset="UTF-8">
+    <title>Top Down 3D Shooter</title>
+    <style>
+        body { 
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #000;
+        }
+        #gameCanvas {
+            width: 100vw;
+            height: 100vh;
+        }
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            font-size: 24px;
+            text-shadow: 2px 2px 2px #000;
+        }
+        #healthBar {
+            width: 200px;
+            height: 20px;
+            background: #333;
+            margin-top: 10px;
+        }
+        #health {
+            width: 100%;
+            height: 100%;
+            background: #ff3333;
+            transition: width 0.3s;
+        }
+        #killCount {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: #fff;
+            font-size: 24px;
+        }
+        .enemyHealthBar {
+            width: 40px;
+            height: 5px;
+            background: #333;
+            position: absolute;
+            top: -10px;
+            left: -20px;
+        }
+        .enemyHealth {
+            width: 100%;
+            height: 100%;
+            background: #ff3333;
+        }
+    </style>
 </head>
 <body>
-  <div id="hud">
+<div id="hud">
     Score: <span id="score">0</span>
     <div id="healthBar"><div id="health"></div></div>
-  </div>
-  <canvas id="gameCanvas"></canvas>
+</div>
+<div id="killCount">Kills: <span id="killCountValue">0</span></div>
+<canvas id="gameCanvas"></canvas>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({
-      canvas: document.getElementById('gameCanvas'),
-      antialias: true
+        canvas: document.getElementById('gameCanvas'),
+        antialias: true
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;  // Enable shadow map
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // Soft shadows
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0x404040);
     scene.add(ambientLight);
-
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 5, 5);
-    directionalLight.castShadow = true;  // Enable shadow casting for the light
-    directionalLight.shadow.camera.left = -10;
-    directionalLight.shadow.camera.right = 10;
-    directionalLight.shadow.camera.top = 10;
-    directionalLight.shadow.camera.bottom = -10;
-    directionalLight.shadow.camera.near = 0.1;
-    directionalLight.shadow.camera.far = 50;
-    directionalLight.shadow.mapSize.set(1024, 1024); // Higher resolution shadows
+    directionalLight.castShadow = true;
     scene.add(directionalLight);
-
-    // Load Garfield texture
-    const textureLoader = new THREE.TextureLoader();
-    const garfieldTexture = textureLoader.load('garfield.png'); // Assuming 'garfield.png' is in your project folder
 
     // Player
     const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
     const playerMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00});
     const player = new THREE.Mesh(playerGeometry, playerMaterial);
     player.position.y = 0.5;
-    player.castShadow = true;  // Enable shadow casting for player
-    player.receiveShadow = true;  // Enable shadow receiving for player
+    player.castShadow = true;
     scene.add(player);
 
-    // Apply Garfield image to the front of the player
-    const playerFrontGeometry = new THREE.PlaneGeometry(1, 1);
-    const playerFrontMaterial = new THREE.MeshBasicMaterial({map: garfieldTexture, transparent: true});
-    const playerFront = new THREE.Mesh(playerFrontGeometry, playerFrontMaterial);
-    playerFront.position.z = 0.51;  // Place in front of the player
-    player.add(playerFront);
-
-    // Floor
+    // Floor with garfield.png texture
+    const loader = new THREE.TextureLoader();
+    const floorTexture = loader.load('garfield.png');
     const floorGeometry = new THREE.PlaneGeometry(50, 50);
-    const floorMaterial = new THREE.MeshPhongMaterial({color: 0x808080, side: THREE.DoubleSide});
+    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture, side: THREE.DoubleSide });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
-    floor.receiveShadow = true;  // Enable shadow receiving for floor
+    floor.receiveShadow = true;
     scene.add(floor);
 
-    // Apply Garfield image to the floor
-    const floorFrontGeometry = new THREE.PlaneGeometry(50, 50);
-    const floorFrontMaterial = new THREE.MeshBasicMaterial({map: garfieldTexture, transparent: true});
-    const floorFront = new THREE.Mesh(floorFrontGeometry, floorFrontMaterial);
-    floorFront.position.y = 0.01;  // Place just above the floor
-    floor.add(floorFront);
+    // Boundaries
+    const boundary = new THREE.BoxGeometry(50, 1, 50);
+    const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+    const boundaryMesh = new THREE.Mesh(boundary, boundaryMaterial);
+    boundaryMesh.position.set(0, 0.5, 0);
+    scene.add(boundaryMesh);
 
     // Game state
     let score = 0;
+    let kills = 0;
     let health = 100;
+    let money = 0;
     let enemies = [];
+    let upgradeBought = false;
+    let projectiles = [];
     const enemySpeed = 0.05;
+    const rangedEnemyChance = 0.5;
     camera.position.set(0, 20, 0);
     camera.lookAt(0, 0, 0);
 
     // Enemy creation
     function createEnemy() {
-      const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
-      const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-      
-      // Random position on the edge of the floor
-      const side = Math.floor(Math.random() * 4);
-      switch(side) {
-        case 0: enemy.position.set(-25, 0.5, Math.random() * 50 - 25); break;
-        case 1: enemy.position.set(25, 0.5, Math.random() * 50 - 25); break;
-        case 2: enemy.position.set(Math.random() * 50 - 25, 0.5, -25); break;
-        case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
-      }
-      
-      enemy.castShadow = true;  // Enable shadow casting for enemies
-      enemy.receiveShadow = true;  // Enable shadow receiving for enemies
-      scene.add(enemy);
-      enemies.push(enemy);
+        const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
+        const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+        enemy.position.y = 0.5;
+        enemy.castShadow = true;
+        enemy.receiveShadow = true;
+
+        // Random position on the edge of the floor
+        const side = Math.floor(Math.random() * 4);
+        switch(side) {
+            case 0: enemy.position.set(-25, 0.5, Math.random() * 50 - 25); break;
+            case 1: enemy.position.set(25, 0.5, Math.random() * 50 - 25); break;
+            case 2: enemy.position.set(Math.random() * 50 - 25, 0.5, -25); break;
+            case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
+        }
+
+        const isRanged = Math.random() < rangedEnemyChance;
+        enemy.isRanged = isRanged;
+
+        // Health bar for enemies
+        const healthBar = document.createElement('div');
+        healthBar.classList.add('enemyHealthBar');
+        document.body.appendChild(healthBar);
+        enemy.health = 100;
+        enemy.healthBar = healthBar;
+
+        scene.add(enemy);
+        enemies.push(enemy);
+
+        // Add shooting for ranged enemies
+        if (isRanged) {
+            enemy.shootInterval = setInterval(() => {
+                if (enemy.isRanged) {
+                    const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+                    shoot(direction, enemy.position);
+                }
+            }, 2000); // 2 seconds cooldown
+        }
     }
 
-    // Projectiles
-    let projectiles = [];
-    function shoot(direction) {
-      const projectileGeometry = new THREE.SphereGeometry(0.2);
-      const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
-      const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-      projectile.position.copy(player.position);
-      projectile.velocity = direction.normalize().multiplyScalar(0.5);
-      projectile.castShadow = true;  // Enable shadow casting for projectiles
-      scene.add(projectile);
-      projectiles.push(projectile);
+    // Shooting mechanism
+    function shoot(direction, startPosition = player.position) {
+        const projectileGeometry = new THREE.SphereGeometry(0.2);
+        const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
+        const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+        projectile.position.copy(startPosition);
+        projectile.velocity = direction.normalize().multiplyScalar(0.5);
+        projectile.castShadow = true;
+        scene.add(projectile);
+        projectiles.push(projectile);
     }
 
     // Input handling
@@ -153,93 +181,109 @@
     window.addEventListener('keydown', (e) => keys[e.key] = true);
     window.addEventListener('keyup', (e) => keys[e.key] = false);
     window.addEventListener('mousemove', (e) => {
-      const vector = new THREE.Vector3(
-        (e.clientX / window.innerWidth) * 2 - 1,
-        -(e.clientY / window.innerHeight) * 2 + 1,
-        0
-      );
-      vector.unproject(camera);
-      const dir = vector.sub(camera.position).normalize();
-      const distance = -camera.position.y / dir.y;
-      const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-      player.lookAt(pos.x, player.position.y, pos.z);
+        const vector = new THREE.Vector3(
+            (e.clientX / window.innerWidth) * 2 - 1,
+            -(e.clientY / window.innerHeight) * 2 + 1,
+            0
+        );
+        vector.unproject(camera);
+        const dir = vector.sub(camera.position).normalize();
+        const distance = -camera.position.y / dir.y;
+        const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+        player.lookAt(pos.x, player.position.y, pos.z);
     });
 
     window.addEventListener('click', () => {
-      const direction = new THREE.Vector3();
-      player.getWorldDirection(direction);
-      shoot(direction);
+        const direction = new THREE.Vector3();
+        player.getWorldDirection(direction);
+        if (money >= 10000 && !upgradeBought) {
+            upgradeBought = true;
+            shoot(direction);
+            shoot(direction);  // Multi-shot upgrade
+        } else {
+            shoot(direction);
+        }
     });
 
     // Game loop
     let lastEnemySpawn = 0;
     function animate() {
-      requestAnimationFrame(animate);
+        requestAnimationFrame(animate);
 
-      // Player movement
-      if (keys['w']) player.position.z -= 0.2;
-      if (keys['s']) player.position.z += 0.2;
-      if (keys['a']) player.position.x -= 0.2;
-      if (keys['d']) player.position.x += 0.2;
+        // Player movement with boundaries
+        if (keys['w'] && player.position.z > -24) player.position.z -= 0.2;
+        if (keys['s'] && player.position.z < 24) player.position.z += 0.2;
+        if (keys['a'] && player.position.x > -24) player.position.x -= 0.2;
+        if (keys['d'] && player.position.x < 24) player.position.x += 0.2;
 
-      // Spawn enemies
-      if (Date.now() - lastEnemySpawn > 2000) {
-        createEnemy();
-        lastEnemySpawn = Date.now();
-      }
-
-      // Update enemies
-      enemies.forEach(enemy => {
-        const direction = new THREE.Vector3()
-          .subVectors(player.position, enemy.position)
-          .normalize();
-        enemy.position.add(direction.multiplyScalar(enemySpeed));
-
-        // Check collision with player
-        if (enemy.position.distanceTo(player.position) < 1) {
-          health -= 10;
-          document.getElementById('health').style.width = health + '%';
-          if (health <= 0) {
-            alert('Game Over! Score: ' + score);
-            location.reload();
-          }
-        }
-      });
-
-      // Update projectiles
-      projectiles.forEach((projectile, index) => {
-        projectile.position.add(projectile.velocity);
-
-        // Remove projectiles that go too far
-        if (projectile.position.length() > 50) {
-          scene.remove(projectile);
-          projectiles.splice(index, 1);
+        // Spawn enemies
+        if (Date.now() - lastEnemySpawn > 2000) {
+            createEnemy();
+            lastEnemySpawn = Date.now();
         }
 
-        // Check collision with enemies
-        enemies.forEach((enemy, enemyIndex) => {
-          if (projectile.position.distanceTo(enemy.position) < 1) {
-            scene.remove(enemy);
-            scene.remove(projectile);
-            enemies.splice(enemyIndex, 1);
-            projectiles.splice(index, 1);
-            score += 100;
-            document.getElementById('score').textContent = score;
-          }
+        // Update enemies
+        enemies.forEach(enemy => {
+            const direction = new THREE.Vector3()
+                .subVectors(player.position, enemy.position)
+                .normalize();
+            enemy.position.add(direction.multiplyScalar(enemySpeed));
+
+            // Update enemy health bar
+            if (enemy.healthBar) {
+                enemy.healthBar.style.width = `${(enemy.health / 100) * 40}px`;
+            }
+
+            // Check collision with player
+            if (enemy.position.distanceTo(player.position) < 1) {
+                health -= 10;
+                document.getElementById('health').style.width = health + '%';
+                if (health <= 0) {
+                    alert('Game Over! Score: ' + score);
+                    location.reload();
+                }
+            }
         });
-      });
 
-      renderer.render(scene, camera);
+        // Update projectiles
+        projectiles.forEach((projectile, index) => {
+            projectile.position.add(projectile.velocity);
+
+            // Remove projectiles that go too far
+            if (projectile.position.length() > 50) {
+                scene.remove(projectile);
+                projectiles.splice(index, 1);
+            }
+
+            // Check collision with enemies
+            enemies.forEach((enemy, enemyIndex) => {
+                if (projectile.position.distanceTo(enemy.position) < 1) {
+                    enemy.health -= 20;
+                    if (enemy.health <= 0) {
+                        kills++;
+                        document.getElementById('killCountValue').textContent = kills;
+                        scene.remove(enemy);
+                        scene.remove(projectile);
+                        enemies.splice(enemyIndex, 1);
+                        projectiles.splice(index, 1);
+                        money += 500;
+                    }
+                }
+            });
+        });
+
+        // Render the scene
+        renderer.render(scene, camera);
     }
 
     // Handle window resize
     window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
     animate();
-  </script>
+</script>
 </body>
 </html>
