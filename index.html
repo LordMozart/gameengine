@@ -125,7 +125,16 @@
     // Enemy creation
     function createEnemy() {
         const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
+        let enemyMaterial;
+
+        // 50% chance of a ranged enemy or melee enemy
+        const isRanged = Math.random() < rangedEnemyChance;
+        if (isRanged) {
+            enemyMaterial = new THREE.MeshPhongMaterial({color: 0x0000ff}); // Blue for ranged enemies
+        } else {
+            enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000}); // Red for melee enemies
+        }
+
         const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
         enemy.position.y = 0.5;
         enemy.castShadow = true;
@@ -139,9 +148,6 @@
             case 2: enemy.position.set(Math.random() * 50 - 25, 0.5, -25); break;
             case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
         }
-
-        const isRanged = Math.random() < rangedEnemyChance;
-        enemy.isRanged = isRanged;
 
         // Health bar for enemies
         const healthBar = document.createElement('div');
@@ -164,7 +170,7 @@
         }
     }
 
-    // Shooting mechanism
+    // Shooting mechanism for both player and enemies
     function shoot(direction, startPosition = player.position) {
         const projectileGeometry = new THREE.SphereGeometry(0.2);
         const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
@@ -222,7 +228,7 @@
             lastEnemySpawn = Date.now();
         }
 
-        // Update enemies
+        // Update enemies and their health
         enemies.forEach(enemy => {
             const direction = new THREE.Vector3()
                 .subVectors(player.position, enemy.position)
@@ -272,7 +278,6 @@
             });
         });
 
-        // Render the scene
         renderer.render(scene, camera);
     }
 
