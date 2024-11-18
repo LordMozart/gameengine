@@ -1,263 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D FPS Game</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-    #crosshair {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 10px;
-      height: 10px;
-      background: red;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-    }
-    #hud {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      font-family: Arial, sans-serif;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D FPS Game</title>
+    <style>
+        body, html { margin: 0; padding: 0; overflow: hidden; height: 100%; }
+        canvas { display: block; }
+        .hud { position: absolute; top: 10px; left: 10px; color: white; font-family: Arial, sans-serif; font-size: 18px; }
+        .hud span { display: block; }
+        #reload { font-size: 16px; color: #ff0000; }
+    </style>
 </head>
 <body>
-  <div id="crosshair"></div>
-  <div id="hud">Health: <span id="playerHealth">100</span> | Score: <span id="score">0</span></div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
-  <script>
-    // Basic setup
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+    <canvas id="gameCanvas"></canvas>
+    <div class="hud">
+        <span id="ammo">Ammo: 10</span>
+        <span id="score">Score: 0</span>
+        <span id="health">Health: 100</span>
+        <span id="reload">Press R to Reload</span>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-    // HUD elements
-    const playerHealthElement = document.getElementById("playerHealth");
-    const scoreElement = document.getElementById("score");
+        // Player and game variables
+        let player = { x: 200, y: 200, z: 100, pitch: 0, yaw: 0, health: 100, ammo: 10, speed: 2, jump: false, jumpHeight: 0 };
+        let bullets = [];
+        let enemies = [{ x: 600, y: 200, z: 100, health: 50 }];
+        let score = 0;
+        let walls = [
+            { x: 400, y: 200, z: 300, w: 500, h: 10, d: 500 }, // Floor
+            { x: 400, y: 200, z: 0, w: 500, h: 10, d: 500 }, // Ceiling
+            { x: 0, y: 200, z: 300, w: 10, h: 500, d: 500 }, // Left wall
+            { x: 800, y: 200, z: 300, w: 10, h: 500, d: 500 }, // Right wall
+            { x: 400, y: 200, z: 0, w: 500, h: 500, d: 10 }, // Front wall
+            { x: 400, y: 200, z: 600, w: 500, h: 500, d: 10 }, // Back wall
+        ];
 
-    // Player properties
-    let playerHealth = 100;
-    let score = 0;
+        // Game settings
+        const gravity = 0.05;
+        const maxJumpHeight = 50;
 
-    // Movement controls
-    const keys = {};
-    let isJumping = false;
-    let velocityY = 0;
-    const gravity = -0.01;
+        // Key and mouse controls
+        let keys = { w: false, a: false, s: false, d: false, space: false, r: false };
+        window.addEventListener('keydown', (e) => { keys[e.key] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.key] = false; });
 
-    document.addEventListener('keydown', (e) => keys[e.key] = true);
-    document.addEventListener('keyup', (e) => keys[e.key] = false);
-
-    const playerSpeed = 0.1;
-    const jumpSpeed = 0.3;
-    const cameraHeight = 2;
-
-    // Handle player movement
-    function handlePlayerMovement() {
-      const forward = new THREE.Vector3();
-      const right = new THREE.Vector3();
-
-      camera.getWorldDirection(forward);
-      forward.y = 0;
-      forward.normalize();
-
-      right.crossVectors(forward, camera.up).normalize();
-
-      const newPosition = camera.position.clone();
-
-      if (keys['w']) newPosition.addScaledVector(forward, playerSpeed);
-      if (keys['s']) newPosition.addScaledVector(forward, -playerSpeed);
-      if (keys['a']) newPosition.addScaledVector(right, -playerSpeed);
-      if (keys['d']) newPosition.addScaledVector(right, playerSpeed);
-
-      // Jumping
-      if (keys[' '] && !isJumping) {
-        isJumping = true;
-        velocityY = jumpSpeed;
-      }
-
-      // Apply gravity
-      velocityY += gravity;
-      newPosition.y += velocityY;
-
-      // Collision with the ground or parkour boxes
-      parkourBoxes.forEach((box) => {
-        const boxBoundingBox = new THREE.Box3().setFromObject(box);
-        if (newPosition.y <= box.position.y + box.scale.y / 2 && boxBoundingBox.containsPoint(newPosition)) {
-          newPosition.y = box.position.y + box.scale.y / 2;
-          velocityY = 0;
-          isJumping = false;
-        }
-      });
-
-      if (newPosition.y < cameraHeight) {
-        newPosition.y = cameraHeight;
-        velocityY = 0;
-        isJumping = false;
-      }
-
-      // Keep player within boundaries
-      newPosition.clamp(
-        new THREE.Vector3(-50, cameraHeight, -50),
-        new THREE.Vector3(50, 10, 50)
-      );
-
-      camera.position.copy(newPosition);
-    }
-
-    // Pointer lock for mouse control
-    document.body.addEventListener('click', () => {
-      document.body.requestPointerLock();
-    });
-
-    let pitch = 0; // Vertical (Up-Down) rotation
-    let yaw = 0; // Horizontal (Left-Right) rotation
-    const maxPitch = Math.PI / 2; // Limit the pitch to ±90 degrees (no flipping)
-
-    // Fixed Camera Rotation Logic
-    document.addEventListener('mousemove', (event) => {
-      if (document.pointerLockElement === document.body) {
-        yaw -= event.movementX * 0.002; // Horizontal rotation
-        pitch -= event.movementY * 0.002; // Vertical rotation
-
-        // Clamping the vertical rotation to prevent flipping
-        pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
-
-        // Apply the rotations to the camera
-        camera.rotation.set(pitch, yaw, 0);
-      }
-    });
-
-    // Add Garfield texture as the background
-    const garfieldTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your image path
-    scene.background = garfieldTexture;
-
-    // Add ground texture
-    const floorGeometry = new THREE.PlaneGeometry(200, 200);
-    const floorTexture = new THREE.TextureLoader().load('ground.jpg'); // Replace with your texture
-    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
-    scene.add(floor);
-
-    // Parkour boxes with proper collision handling
-    const parkourBoxes = [];
-    const boxTexture = new THREE.TextureLoader().load('garfield.png'); // Replace with your texture
-
-    for (let i = 0; i < 10; i++) {
-      const boxGeometry = new THREE.BoxGeometry(Math.random() * 5 + 1, Math.random() * 3 + 1, Math.random() * 5 + 1);
-      const boxMaterial = new THREE.MeshBasicMaterial({ map: boxTexture });
-      const box = new THREE.Mesh(boxGeometry, boxMaterial);
-      box.position.set(
-        Math.random() * 80 - 40,
-        Math.random() * 5 + 1,
-        Math.random() * 80 - 40
-      );
-      scene.add(box);
-      parkourBoxes.push(box);
-    }
-
-    // Enemies with hitbox detection
-    const enemies = [];
-    const enemySpeed = 0.05;
-
-    function spawnEnemy() {
-      const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const enemyMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-      enemy.position.set(
-        Math.random() * 40 - 20,
-        1,
-        Math.random() * 40 - 20
-      );
-      enemy.health = 50;
-      enemies.push(enemy);
-      scene.add(enemy);
-    }
-
-    setInterval(spawnEnemy, 3000);
-
-    function updateEnemies() {
-      enemies.forEach((enemy, index) => {
-        const direction = new THREE.Vector3();
-        direction.subVectors(camera.position, enemy.position).normalize();
-        enemy.position.addScaledVector(direction, enemySpeed);
-
-        if (enemy.position.distanceTo(camera.position) < 1) {
-          playerHealth -= 10;
-          playerHealthElement.textContent = playerHealth;
-          if (playerHealth <= 0) alert("Game Over!");
-          scene.remove(enemy);
-          enemies.splice(index, 1);
-        }
-      });
-    }
-
-    // Bullet mechanics with collision detection
-    const bullets = [];
-    function updateBullets() {
-      bullets.forEach((bullet, index) => {
-        bullet.position.add(bullet.velocity);
-        if (bullet.position.distanceTo(bullet.startPosition) > 50) {
-          scene.remove(bullet);
-          bullets.splice(index, 1);
-        }
-
-        parkourBoxes.forEach((box) => {
-          const boxBoundingBox = new THREE.Box3().setFromObject(box);
-          if (boxBoundingBox.containsPoint(bullet.position)) {
-            scene.remove(bullet);
-            bullets.splice(index, 1);
-          }
+        let mouseX = 0, mouseY = 0;
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
         });
 
-        enemies.forEach((enemy, enemyIndex) => {
-          if (bullet.position.distanceTo(enemy.position) < 1) {
-            enemy.health -= 25;
-            if (enemy.health <= 0) {
-              scene.remove(enemy);
-              enemies.splice(enemyIndex, 1);
-              score += 10;
-              scoreElement.textContent = score;
+        // Bullet and shooting mechanics
+        canvas.addEventListener('click', () => {
+            if (player.ammo > 0) {
+                fireBullet();
+            } else {
+                alert('Out of ammo! Press "R" to reload.');
             }
-            scene.remove(bullet);
-            bullets.splice(index, 1);
-          }
         });
-      });
-    }
 
-    // Shooting bullets with collision detection
-    document.addEventListener('click', () => {
-      const bulletGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-      const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-      const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-      bullet.position.copy(camera.position);
-      const direction = new THREE.Vector3();
-      camera.getWorldDirection(direction);
-      bullet.velocity = direction.multiplyScalar(0.5);
-      bullet.startPosition = camera.position.clone();
-      bullets.push(bullet);
-      scene.add(bullet);
-    });
+        function fireBullet() {
+            bullets.push({
+                x: player.x,
+                y: player.y,
+                z: player.z,
+                dx: Math.sin(player.yaw),
+                dy: Math.sin(player.pitch),
+                dz: Math.cos(player.yaw),
+                speed: 5
+            });
+            player.ammo--;
+            updateHUD();
+        }
 
-    // Game loop
-    function animate() {
-      requestAnimationFrame(animate);
-      handlePlayerMovement();
-      updateEnemies();
-      updateBullets();
-      renderer.render(scene, camera);
-    }
+        // Update ammo counter
+        function updateHUD() {
+            document.getElementById('ammo').textContent = `Ammo: ${player.ammo}`;
+            document.getElementById('score').textContent = `Score: ${score}`;
+            document.getElementById('health').textContent = `Health: ${player.health}`;
+        }
 
-    animate();
-  </script>
+        // Reload function
+        function reload() {
+            if (keys.r) {
+                player.ammo = 10;
+                updateHUD();
+            }
+        }
+
+        // Move player based on WASD and jumping
+        function movePlayer() {
+            if (keys.w) { player.x += Math.sin(player.yaw) * player.speed; player.z -= Math.cos(player.yaw) * player.speed; }
+            if (keys.s) { player.x -= Math.sin(player.yaw) * player.speed; player.z += Math.cos(player.yaw) * player.speed; }
+            if (keys.a) { player.x -= Math.cos(player.yaw) * player.speed; player.z -= Math.sin(player.yaw) * player.speed; }
+            if (keys.d) { player.x += Math.cos(player.yaw) * player.speed; player.z += Math.sin(player.yaw) * player.speed; }
+
+            if (keys.space && !player.jump) {
+                player.jump = true;
+                player.jumpHeight = 10;
+            }
+        }
+
+        // Update player's jump (gravity effect)
+        function handleJump() {
+            if (player.jump) {
+                player.y += player.jumpHeight;
+                player.jumpHeight -= gravity;
+                if (player.y <= 200) {  // Reset when reaching the ground
+                    player.y = 200;
+                    player.jump = false;
+                    player.jumpHeight = 0;
+                }
+            }
+        }
+
+        // Check bullet collisions
+        function checkCollisions() {
+            bullets.forEach((bullet, index) => {
+                enemies.forEach((enemy, enemyIndex) => {
+                    let distance = Math.sqrt(Math.pow(bullet.x - enemy.x, 2) + Math.pow(bullet.y - enemy.y, 2) + Math.pow(bullet.z - enemy.z, 2));
+                    if (distance < 10) {
+                        score++;
+                        enemies.splice(enemyIndex, 1);  // Remove enemy
+                        bullets.splice(index, 1);  // Remove bullet
+                    }
+                });
+
+                walls.forEach(wall => {
+                    if (bullet.x > wall.x && bullet.x < wall.x + wall.w && bullet.y > wall.y && bullet.y < wall.y + wall.h && bullet.z > wall.z && bullet.z < wall.z + wall.d) {
+                        bullets.splice(index, 1);  // Remove bullet when hitting wall
+                    }
+                });
+            });
+        }
+
+        // Move bullets
+        function moveBullets() {
+            bullets.forEach(bullet => {
+                bullet.x += bullet.dx * bullet.speed;
+                bullet.y += bullet.dy * bullet.speed;
+                bullet.z += bullet.dz * bullet.speed;
+            });
+        }
+
+        // Render environment (walls and floor)
+        function renderWalls() {
+            walls.forEach(wall => {
+                ctx.fillStyle = '#999';
+                ctx.fillRect(wall.x, wall.z, wall.w, wall.d);  // Basic 2D projection for simplicity
+            });
+        }
+
+        // Render enemies
+        function renderEnemies() {
+            enemies.forEach(enemy => {
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.z, 10, 0, Math.PI * 2);
+                ctx.fillStyle = '#ff0000';
+                ctx.fill();
+            });
+        }
+
+        // Handle game update loop
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update player movement
+            movePlayer();
+            handleJump();
+            reload();
+
+            // Move and check bullets
+            moveBullets();
+            checkCollisions();
+
+            // Render the game world
+            renderWalls();
+            renderEnemies();
+
+            // Update the HUD
+            updateHUD();
+
+            // Continue the game loop
+            requestAnimationFrame(update);
+        }
+
+        // Start game
+        update();
+    </script>
 </body>
 </html>
