@@ -2,7 +2,7 @@
 <head>
   <base href="." />
   <meta charset="UTF-8">
-  <title>Top Down 3D Shooter with Shadows and Refraction</title>
+  <title>Top Down 3D Shooter with Shadows and Image Textures</title>
   <style>
     body {
       margin: 0;
@@ -71,31 +71,9 @@
     directionalLight.shadow.mapSize.set(1024, 1024); // Higher resolution shadows
     scene.add(directionalLight);
 
-    // Create a CubeTexture for the environment (reflection/refraction)
-    const textureLoader = new THREE.CubeTextureLoader();
-    const envMap = textureLoader.load([
-      'textures/px.jpg', 'textures/nx.jpg',
-      'textures/py.jpg', 'textures/ny.jpg',
-      'textures/pz.jpg', 'textures/nz.jpg'
-    ]);
-    scene.background = envMap;
-    scene.environment = envMap;
-
-    // Refractor (for water or glass effect)
-    const refractorGeometry = new THREE.PlaneGeometry(50, 50);
-    const refractorMaterial = new THREE.MeshBasicMaterial({
-      color: 0x2194CE,
-      transparent: true,
-      opacity: 0.7,
-      envMap: envMap,
-      refractionRatio: 0.98
-    });
-
-    const refractor = new THREE.Mesh(refractorGeometry, refractorMaterial);
-    refractor.rotation.x = -Math.PI / 2;  // Rotate to lie flat
-    refractor.position.y = 0.5;  // Position above the floor
-    refractor.receiveShadow = true; // Make sure it can receive shadows
-    scene.add(refractor);
+    // Load Garfield texture
+    const textureLoader = new THREE.TextureLoader();
+    const garfieldTexture = textureLoader.load('garfield.png'); // Assuming 'garfield.png' is in your project folder
 
     // Player
     const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -106,6 +84,13 @@
     player.receiveShadow = true;  // Enable shadow receiving for player
     scene.add(player);
 
+    // Apply Garfield image to the front of the player
+    const playerFrontGeometry = new THREE.PlaneGeometry(1, 1);
+    const playerFrontMaterial = new THREE.MeshBasicMaterial({map: garfieldTexture, transparent: true});
+    const playerFront = new THREE.Mesh(playerFrontGeometry, playerFrontMaterial);
+    playerFront.position.z = 0.51;  // Place in front of the player
+    player.add(playerFront);
+
     // Floor
     const floorGeometry = new THREE.PlaneGeometry(50, 50);
     const floorMaterial = new THREE.MeshPhongMaterial({color: 0x808080, side: THREE.DoubleSide});
@@ -113,6 +98,13 @@
     floor.rotation.x = Math.PI / 2;
     floor.receiveShadow = true;  // Enable shadow receiving for floor
     scene.add(floor);
+
+    // Apply Garfield image to the floor
+    const floorFrontGeometry = new THREE.PlaneGeometry(50, 50);
+    const floorFrontMaterial = new THREE.MeshBasicMaterial({map: garfieldTexture, transparent: true});
+    const floorFront = new THREE.Mesh(floorFrontGeometry, floorFrontMaterial);
+    floorFront.position.y = 0.01;  // Place just above the floor
+    floor.add(floorFront);
 
     // Game state
     let score = 0;
@@ -217,7 +209,7 @@
       // Update projectiles
       projectiles.forEach((projectile, index) => {
         projectile.position.add(projectile.velocity);
-        
+
         // Remove projectiles that go too far
         if (projectile.position.length() > 50) {
           scene.remove(projectile);
