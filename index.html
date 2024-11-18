@@ -174,7 +174,7 @@
     let isPaused = false;
     let upgradeHealth = 0;
     let upgradeSpeed = 0.2;
-    let lastEnemySpawn = 0; // Fixed initialization issue
+    let lastEnemySpawn = 0; 
 
     // Enemy creation
     function createEnemy() {
@@ -237,15 +237,23 @@
         }
     });
 
-    // Upgrade menu logic
+    // Upgrade menu
     window.addEventListener('keydown', (e) => {
-        if (isPaused && e.key === 'u') {
+        if (e.key === 'u' || e.key === 'U') {
             document.getElementById('upgradeMenu').style.display = 'flex';
             document.getElementById('pauseMenu').style.display = 'none';
+            document.getElementById('blurBackground').style.display = 'block';
         }
     });
 
-    // Button event listeners for upgrades
+    // Close upgrade menu
+    document.getElementById('closeUpgradeMenuButton').addEventListener('click', () => {
+        document.getElementById('upgradeMenu').style.display = 'none';
+        document.getElementById('pauseMenu').style.display = 'flex';
+        document.getElementById('blurBackground').style.display = 'none';
+    });
+
+    // Upgrade buttons
     document.getElementById('upgradeHealthButton').addEventListener('click', () => {
         if (money >= 5000) {
             health += 20;
@@ -261,16 +269,15 @@
         }
     });
 
-    document.getElementById('closeUpgradeMenuButton').addEventListener('click', () => {
-        document.getElementById('upgradeMenu').style.display = 'none';
-        document.getElementById('pauseMenu').style.display = 'flex';
-    });
-
     // Game loop
     function animate() {
         if (isPaused) return;
 
         requestAnimationFrame(animate);
+
+        // Update camera for top-down view
+        camera.position.set(0, 30, 0); // Above the player
+        camera.lookAt(player.position); // Looking down at the player
 
         // Player movement with boundaries
         if (keys['w'] && player.position.z > -24) player.position.z -= upgradeSpeed;
