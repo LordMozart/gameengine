@@ -2,7 +2,7 @@
 <head>
   <base href="." />
   <meta charset="UTF-8">
-  <title>Top Down 3D Shooter</title>
+  <title>Top Down 3D Shooter with Shadows</title>
   <style>
     body {
       margin: 0;
@@ -52,12 +52,15 @@
       antialias: true
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;  // Enable shadow map
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // Soft shadows
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0x404040);
     scene.add(ambientLight);
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 5, 5);
+    directionalLight.castShadow = true;  // Enable shadow casting for the light
     scene.add(directionalLight);
 
     // Player
@@ -65,6 +68,8 @@
     const playerMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00});
     const player = new THREE.Mesh(playerGeometry, playerMaterial);
     player.position.y = 0.5;
+    player.castShadow = true;  // Enable shadow casting for player
+    player.receiveShadow = true;  // Enable shadow receiving for player
     scene.add(player);
 
     // Floor
@@ -72,6 +77,7 @@
     const floorMaterial = new THREE.MeshPhongMaterial({color: 0x808080, side: THREE.DoubleSide});
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = Math.PI / 2;
+    floor.receiveShadow = true;  // Enable shadow receiving for floor
     scene.add(floor);
 
     // Game state
@@ -100,6 +106,8 @@
       }
       
       enemy.type = type; // 'melee' or 'ranged'
+      enemy.castShadow = true;  // Enable shadow casting for enemies
+      enemy.receiveShadow = true;  // Enable shadow receiving for enemies
       scene.add(enemy);
       enemies.push(enemy);
     }
@@ -113,6 +121,7 @@
       
       const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
       projectile.velocity = direction.multiplyScalar(projectileSpeed);
+      projectile.castShadow = true;  // Enable shadow casting for projectiles
       scene.add(projectile);
       enemy.projectiles = enemy.projectiles || [];
       enemy.projectiles.push(projectile);
@@ -126,6 +135,7 @@
       const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
       projectile.position.copy(player.position);
       projectile.velocity = direction.normalize().multiplyScalar(projectileSpeed);
+      projectile.castShadow = true;  // Enable shadow casting for player's projectiles
       scene.add(projectile);
       projectiles.push(projectile);
     }
@@ -136,6 +146,7 @@
       const upgradeMaterial = new THREE.MeshPhongMaterial({color: 0x00ffff});
       const upgrade = new THREE.Mesh(upgradeGeometry, upgradeMaterial);
       upgrade.position.set(Math.random() * 50 - 25, 0.5, Math.random() * 50 - 25);
+      upgrade.castShadow = true;  // Enable shadow casting for upgrades
       scene.add(upgrade);
       upgrades.push(upgrade);
     }
@@ -189,8 +200,7 @@
 
       // Spawn enemies
       if (Date.now() - lastEnemySpawn > 2000) {
-        const type = Math.random() < 0.5 ? 'melee' : 'ranged';
-        createEnemy(type);
+        createEnemy('ranged');
         lastEnemySpawn = Date.now();
       }
 
@@ -202,13 +212,11 @@
 
       // Update enemies
       enemies.forEach(enemy => {
-        if (enemy.type === 'ranged' && Math.random() < 0.01) {
-          createEnemyProjectile(enemy);
-        }
-
-        const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+        const direction = new THREE.Vector3()
+          .subVectors(player.position, enemy.position)
+          .normalize();
         enemy.position.add(direction.multiplyScalar(enemySpeed));
-
+        
         // Check collision with player
         if (enemy.position.distanceTo(player.position) < 1) {
           health -= 10;
@@ -218,12 +226,17 @@
             location.reload();
           }
         }
+
+        // Enemy shooting
+        if (enemy.type === 'ranged' && Math.random() < 0.01) {
+          createEnemyProjectile(enemy);
+        }
       });
 
       // Update projectiles
       projectiles.forEach((projectile, index) => {
         projectile.position.add(projectile.velocity);
-        
+
         // Remove projectiles that go too far
         if (projectile.position.length() > 50) {
           scene.remove(projectile);
