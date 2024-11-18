@@ -129,6 +129,16 @@
     camera.position.set(0, 20, 0);
     camera.lookAt(0, 0, 0);
 
+    // Floor texture (Garfield image)
+    const floorTexture = new THREE.TextureLoader().load('garfield.png');
+    const floorGeometry = new THREE.PlaneGeometry(50, 50);
+    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2; // Rotate the plane to make it horizontal
+    floor.position.y = -0.5; // Place it below the player
+    floor.receiveShadow = true;
+    scene.add(floor);
+
     // Upgrade system
     let gamePaused = false;
     let upgradeCosts = {
