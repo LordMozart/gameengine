@@ -1,3 +1,4 @@
+<html>
 <head>
     <base href="." />
     <meta charset="UTF-8">
@@ -53,45 +54,66 @@
             height: 100%;
             background: #ff3333;
         }
-        /* Blur effect */
+        /* Pause and upgrade menu styles */
+        #pauseMenu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 36px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 100;
+        }
+        #upgradeMenu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-size: 36px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 101;
+        }
+        .blur {
+            filter: blur(5px);
+        }
         #blurBackground {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 99;
             display: none;
+            filter: blur(5px);
         }
-        /* Upgrade menu */
-        #upgradeMenu {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 300px;
-            height: 400px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #fff;
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-        }
-        #upgradeMenu button {
-            margin: 10px;
-            padding: 10px;
-            background: #444;
+        .upgradeButton {
+            background-color: #333;
             color: white;
-            border: 1px solid #fff;
+            padding: 20px;
+            font-size: 24px;
+            margin: 10px;
+            border: none;
             cursor: pointer;
-            font-size: 18px;
+            transition: background-color 0.3s;
+        }
+        .upgradeButton:hover {
+            background-color: #555;
         }
     </style>
 </head>
-
 <body>
 <div id="hud">
     Score: <span id="score">0</span>
@@ -100,14 +122,19 @@
 <div id="killCount">Kills: <span id="killCountValue">0</span></div>
 <canvas id="gameCanvas"></canvas>
 
-<!-- Upgrade menu -->
-<div id="blurBackground"></div>
-<div id="upgradeMenu">
-    <h2>Upgrade Menu</h2>
-    <p>Money: <span id="money">0</span></p>
-    <button id="upgradeButton">Buy Multi-Shot (10000)</button>
-    <button id="closeUpgradeMenu">Close</button>
+<div id="pauseMenu">
+    <p>Game Paused</p>
+    <p>Press 'P' to resume</p>
 </div>
+
+<div id="upgradeMenu">
+    <p>Upgrade Menu</p>
+    <button class="upgradeButton" id="upgradeHealthButton">Upgrade Health (5000)</button>
+    <button class="upgradeButton" id="upgradeSpeedButton">Upgrade Speed (5000)</button>
+    <button class="upgradeButton" id="closeUpgradeMenuButton">Close Menu</button>
+</div>
+
+<div id="blurBackground"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -121,53 +148,56 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x404040);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 5, 5);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+
+    // Player
+    const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const playerMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00});
+    const player = new THREE.Mesh(playerGeometry, playerMaterial);
+    player.position.y = 0.5;
+    player.castShadow = true;
+    scene.add(player);
+
     // Game state
     let score = 0;
     let kills = 0;
     let health = 100;
     let money = 0;
     let enemies = [];
-    let upgradeBought = false;
-    let gamePaused = false;  // To track if the game is paused
     let projectiles = [];
-    const enemySpeed = 0.05;
-    const rangedEnemyChance = 0.5;
-    camera.position.set(0, 20, 0);
-    camera.lookAt(0, 0, 0);
+    let isPaused = false;
+    let upgradeHealth = 0;
+    let upgradeSpeed = 0.2;
 
-    // Pause game function
-    function pauseGame() {
-        gamePaused = true;
-        document.getElementById('blurBackground').style.display = 'block';
-        document.getElementById('upgradeMenu').style.display = 'flex';
-    }
+    // Enemy creation
+    function createEnemy() {
+        const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
+        const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+        enemy.position.y = 0.5;
+        enemy.castShadow = true;
+        enemy.receiveShadow = true;
 
-    // Unpause game
-    function unpauseGame() {
-        gamePaused = false;
-        document.getElementById('blurBackground').style.display = 'none';
-        document.getElementById('upgradeMenu').style.display = 'none';
-    }
-
-    // Handle the upgrade button
-    document.getElementById('upgradeButton').addEventListener('click', () => {
-        if (money >= 10000 && !upgradeBought) {
-            upgradeBought = true;
-            money -= 10000;
-            document.getElementById('money').textContent = money;
-            alert('Upgrade Purchased! Multi-Shot enabled.');
-        } else {
-            alert('Not enough money or already purchased.');
+        // Random position on the edge of the floor
+        const side = Math.floor(Math.random() * 4);
+        switch(side) {
+            case 0: enemy.position.set(-25, 0.5, Math.random() * 50 - 25); break;
+            case 1: enemy.position.set(25, 0.5, Math.random() * 50 - 25); break;
+            case 2: enemy.position.set(Math.random() * 50 - 25, 0.5, -25); break;
+            case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
         }
-    });
 
-    // Close the upgrade menu
-    document.getElementById('closeUpgradeMenu').addEventListener('click', unpauseGame);
+        scene.add(enemy);
+        enemies.push(enemy);
+    }
 
-    // Player and game setup...
-    // Rest of the game code...
-
-    // Shooting mechanism with multi-shot upgrade
+    // Shooting mechanism
     function shoot(direction, startPosition = player.position) {
         const projectileGeometry = new THREE.SphereGeometry(0.2);
         const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
@@ -177,35 +207,107 @@
         projectile.castShadow = true;
         scene.add(projectile);
         projectiles.push(projectile);
-
-        // Multi-shot upgrade
-        if (upgradeBought) {
-            const additionalProjectile1 = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            additionalProjectile1.position.copy(startPosition);
-            additionalProjectile1.velocity = direction.normalize().multiplyScalar(0.5).applyEuler(new THREE.Euler(0, Math.PI / 4, 0));
-            scene.add(additionalProjectile1);
-            projectiles.push(additionalProjectile1);
-
-            const additionalProjectile2 = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            additionalProjectile2.position.copy(startPosition);
-            additionalProjectile2.velocity = direction.normalize().multiplyScalar(0.5).applyEuler(new THREE.Euler(0, -Math.PI / 4, 0));
-            scene.add(additionalProjectile2);
-            projectiles.push(additionalProjectile2);
-        }
     }
 
-    // Game loop and other game logic...
+    // Input handling
+    const keys = {};
+    window.addEventListener('keydown', (e) => keys[e.key] = true);
+    window.addEventListener('keyup', (e) => keys[e.key] = false);
+
+    window.addEventListener('click', () => {
+        const direction = new THREE.Vector3();
+        player.getWorldDirection(direction);
+        shoot(direction);
+    });
+
+    // Pause menu logic
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'p' || e.key === 'P') {
+            isPaused = !isPaused;
+            if (isPaused) {
+                document.getElementById('pauseMenu').style.display = 'flex';
+                document.getElementById('blurBackground').style.display = 'block';
+                document.body.classList.add('blur');
+            } else {
+                document.getElementById('pauseMenu').style.display = 'none';
+                document.getElementById('blurBackground').style.display = 'none';
+                document.body.classList.remove('blur');
+            }
+        }
+    });
+
+    // Upgrade menu logic
+    window.addEventListener('keydown', (e) => {
+        if (isPaused && e.key === 'u') {
+            document.getElementById('upgradeMenu').style.display = 'flex';
+            document.getElementById('pauseMenu').style.display = 'none';
+        }
+    });
+
+    // Button event listeners for upgrades
+    document.getElementById('upgradeHealthButton').addEventListener('click', () => {
+        if (money >= 5000) {
+            health += 20;
+            money -= 5000;
+            document.getElementById('health').style.width = health + '%';
+        }
+    });
+
+    document.getElementById('upgradeSpeedButton').addEventListener('click', () => {
+        if (money >= 5000) {
+            upgradeSpeed += 0.1;
+            money -= 5000;
+        }
+    });
+
+    document.getElementById('closeUpgradeMenuButton').addEventListener('click', () => {
+        document.getElementById('upgradeMenu').style.display = 'none';
+        document.getElementById('pauseMenu').style.display = 'flex';
+    });
+
+    // Game loop
     function animate() {
-        if (gamePaused) return;  // If the game is paused, don't animate
+        if (isPaused) return;
 
         requestAnimationFrame(animate);
 
-        // Update game mechanics, enemies, player, etc...
+        // Player movement with boundaries
+        if (keys['w'] && player.position.z > -24) player.position.z -= upgradeSpeed;
+        if (keys['s'] && player.position.z < 24) player.position.z += upgradeSpeed;
+        if (keys['a'] && player.position.x > -24) player.position.x -= upgradeSpeed;
+        if (keys['d'] && player.position.x < 24) player.position.x += upgradeSpeed;
 
-        // Render the scene
+        // Spawn enemies
+        if (Date.now() - lastEnemySpawn > 2000) {
+            createEnemy();
+            lastEnemySpawn = Date.now();
+        }
+
+        // Update enemies
+        enemies.forEach(enemy => {
+            const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
+            enemy.position.add(direction.multiplyScalar(0.05));
+
+            // Check collision with player
+            if (enemy.position.distanceTo(player.position) < 1) {
+                health -= 10;
+                document.getElementById('health').style.width = health + '%';
+                if (health <= 0) {
+                    alert('Game Over! Score: ' + score);
+                    location.reload();
+                }
+            }
+        });
+
+        // Update projectiles
+        projectiles.forEach((projectile, index) => {
+            projectile.position.add(projectile.velocity);
+        });
+
         renderer.render(scene, camera);
     }
 
     animate();
 </script>
 </body>
+</html>
