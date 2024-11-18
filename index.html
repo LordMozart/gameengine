@@ -2,7 +2,7 @@
 <head>
   <base href="." />
   <meta charset="UTF-8">
-  <title>Top Down 3D Shooter with Shadows and Image Textures</title>
+  <title>Top Down 3D Shooter with Upgrades</title>
   <style>
     body {
       margin: 0;
@@ -34,6 +34,40 @@
       background: #ff3333;
       transition: width 0.3s;
     }
+    #upgradeBar {
+      position: fixed;
+      top: 50%;
+      left: 20px;
+      width: 20px;
+      height: 300px;
+      background-color: #444;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #upgradeMenu {
+      position: fixed;
+      top: 50%;
+      left: 100px;
+      width: 200px;
+      background-color: rgba(0, 0, 0, 0.8);
+      padding: 10px;
+      display: none;
+      border-radius: 5px;
+      box-shadow: 0 0 10px #fff;
+    }
+    .upgradeButton {
+      width: 100%;
+      padding: 10px;
+      background-color: #222;
+      color: #fff;
+      margin-bottom: 5px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+    }
+    .upgradeButton:hover {
+      background-color: #555;
+    }
   </style>
 </head>
 <body>
@@ -42,6 +76,14 @@
     <div id="healthBar"><div id="health"></div></div>
   </div>
   <canvas id="gameCanvas"></canvas>
+
+  <div id="upgradeBar"></div>
+  <div id="upgradeMenu">
+    <button class="upgradeButton" id="upgradeSpeed">Speed - Cost: 100</button>
+    <button class="upgradeButton" id="upgradeHealth">Health - Cost: 200</button>
+    <button class="upgradeButton" id="upgradeDamage">Damage - Cost: 150</button>
+    <button class="upgradeButton" id="closeMenu">Close</button>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
@@ -52,8 +94,8 @@
       antialias: true
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;  // Enable shadow map
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // Soft shadows
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0x404040);
@@ -61,50 +103,17 @@
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 5, 5);
-    directionalLight.castShadow = true;  // Enable shadow casting for the light
-    directionalLight.shadow.camera.left = -10;
-    directionalLight.shadow.camera.right = 10;
-    directionalLight.shadow.camera.top = 10;
-    directionalLight.shadow.camera.bottom = -10;
-    directionalLight.shadow.camera.near = 0.1;
-    directionalLight.shadow.camera.far = 50;
-    directionalLight.shadow.mapSize.set(1024, 1024); // Higher resolution shadows
+    directionalLight.castShadow = true;
     scene.add(directionalLight);
-
-    // Load Garfield texture
-    const textureLoader = new THREE.TextureLoader();
-    const garfieldTexture = textureLoader.load('garfield.png'); // Assuming 'garfield.png' is in your project folder
 
     // Player
     const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
     const playerMaterial = new THREE.MeshPhongMaterial({color: 0x00ff00});
     const player = new THREE.Mesh(playerGeometry, playerMaterial);
     player.position.y = 0.5;
-    player.castShadow = true;  // Enable shadow casting for player
-    player.receiveShadow = true;  // Enable shadow receiving for player
+    player.castShadow = true;
+    player.receiveShadow = true;
     scene.add(player);
-
-    // Apply Garfield image to the front of the player
-    const playerFrontGeometry = new THREE.PlaneGeometry(1, 1);
-    const playerFrontMaterial = new THREE.MeshBasicMaterial({map: garfieldTexture, transparent: true});
-    const playerFront = new THREE.Mesh(playerFrontGeometry, playerFrontMaterial);
-    playerFront.position.z = 0.51;  // Place in front of the player
-    player.add(playerFront);
-
-    // Floor
-    const floorGeometry = new THREE.PlaneGeometry(50, 50);
-    const floorMaterial = new THREE.MeshPhongMaterial({color: 0x808080, side: THREE.DoubleSide});
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = Math.PI / 2;
-    floor.receiveShadow = true;  // Enable shadow receiving for floor
-    scene.add(floor);
-
-    // Apply Garfield image to the floor
-    const floorFrontGeometry = new THREE.PlaneGeometry(50, 50);
-    const floorFrontMaterial = new THREE.MeshBasicMaterial({map: garfieldTexture, transparent: true});
-    const floorFront = new THREE.Mesh(floorFrontGeometry, floorFrontMaterial);
-    floorFront.position.y = 0.01;  // Place just above the floor
-    floor.add(floorFront);
 
     // Game state
     let score = 0;
@@ -114,13 +123,69 @@
     camera.position.set(0, 20, 0);
     camera.lookAt(0, 0, 0);
 
+    // Upgrade system
+    let gamePaused = false;
+    let upgradeCosts = {
+      speed: 100,
+      health: 200,
+      damage: 150
+    };
+    let upgradeMultipliers = {
+      speed: 1.1, // 10% speed increase
+      health: 1.25, // 25% health increase
+      damage: 1.2 // 20% damage increase
+    };
+
+    // Game functions
+    function togglePause() {
+      gamePaused = !gamePaused;
+      if (gamePaused) {
+        document.getElementById('upgradeMenu').style.display = 'block';
+        cancelAnimationFrame(animationId);
+      } else {
+        document.getElementById('upgradeMenu').style.display = 'none';
+        animate();
+      }
+    }
+
+    // Add event listener to the upgrade bar
+    document.getElementById('upgradeBar').addEventListener('click', togglePause);
+
+    // Upgrade handling
+    function applyUpgrade(upgrade) {
+      if (score >= upgradeCosts[upgrade]) {
+        score -= upgradeCosts[upgrade];
+        document.getElementById('score').textContent = score;
+        
+        // Apply the upgrade
+        if (upgrade === 'speed') {
+          player.position.x += upgradeMultipliers[upgrade];
+          upgradeCosts[upgrade] *= 1.25; // Increase cost for next upgrade
+          document.getElementById('upgradeSpeed').textContent = `Speed - Cost: ${Math.round(upgradeCosts[upgrade])}`;
+        } else if (upgrade === 'health') {
+          health += 10 * upgradeMultipliers[upgrade]; // Increase health by 25%
+          document.getElementById('health').style.width = health + '%';
+          upgradeCosts[upgrade] *= 1.25;
+          document.getElementById('upgradeHealth').textContent = `Health - Cost: ${Math.round(upgradeCosts[upgrade])}`;
+        } else if (upgrade === 'damage') {
+          // Example: increase player's damage (this can be more complex, e.g., adjusting projectile speed or size)
+          upgradeCosts[upgrade] *= 1.25;
+          document.getElementById('upgradeDamage').textContent = `Damage - Cost: ${Math.round(upgradeCosts[upgrade])}`;
+        }
+      }
+    }
+
+    // Button actions
+    document.getElementById('upgradeSpeed').addEventListener('click', () => applyUpgrade('speed'));
+    document.getElementById('upgradeHealth').addEventListener('click', () => applyUpgrade('health'));
+    document.getElementById('upgradeDamage').addEventListener('click', () => applyUpgrade('damage'));
+    document.getElementById('closeMenu').addEventListener('click', togglePause);
+
     // Enemy creation
     function createEnemy() {
       const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
       const enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
       const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-      
-      // Random position on the edge of the floor
       const side = Math.floor(Math.random() * 4);
       switch(side) {
         case 0: enemy.position.set(-25, 0.5, Math.random() * 50 - 25); break;
@@ -128,53 +193,18 @@
         case 2: enemy.position.set(Math.random() * 50 - 25, 0.5, -25); break;
         case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
       }
-      
-      enemy.castShadow = true;  // Enable shadow casting for enemies
-      enemy.receiveShadow = true;  // Enable shadow receiving for enemies
+      enemy.castShadow = true;
+      enemy.receiveShadow = true;
       scene.add(enemy);
       enemies.push(enemy);
     }
 
-    // Projectiles
-    let projectiles = [];
-    function shoot(direction) {
-      const projectileGeometry = new THREE.SphereGeometry(0.2);
-      const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
-      const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-      projectile.position.copy(player.position);
-      projectile.velocity = direction.normalize().multiplyScalar(0.5);
-      projectile.castShadow = true;  // Enable shadow casting for projectiles
-      scene.add(projectile);
-      projectiles.push(projectile);
-    }
-
-    // Input handling
-    const keys = {};
-    window.addEventListener('keydown', (e) => keys[e.key] = true);
-    window.addEventListener('keyup', (e) => keys[e.key] = false);
-    window.addEventListener('mousemove', (e) => {
-      const vector = new THREE.Vector3(
-        (e.clientX / window.innerWidth) * 2 - 1,
-        -(e.clientY / window.innerHeight) * 2 + 1,
-        0
-      );
-      vector.unproject(camera);
-      const dir = vector.sub(camera.position).normalize();
-      const distance = -camera.position.y / dir.y;
-      const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-      player.lookAt(pos.x, player.position.y, pos.z);
-    });
-
-    window.addEventListener('click', () => {
-      const direction = new THREE.Vector3();
-      player.getWorldDirection(direction);
-      shoot(direction);
-    });
-
     // Game loop
-    let lastEnemySpawn = 0;
+    let animationId;
     function animate() {
-      requestAnimationFrame(animate);
+      if (gamePaused) return;
+
+      animationId = requestAnimationFrame(animate);
 
       // Player movement
       if (keys['w']) player.position.z -= 0.2;
@@ -190,12 +220,9 @@
 
       // Update enemies
       enemies.forEach(enemy => {
-        const direction = new THREE.Vector3()
-          .subVectors(player.position, enemy.position)
-          .normalize();
+        const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
         enemy.position.add(direction.multiplyScalar(enemySpeed));
 
-        // Check collision with player
         if (enemy.position.distanceTo(player.position) < 1) {
           health -= 10;
           document.getElementById('health').style.width = health + '%';
@@ -206,33 +233,9 @@
         }
       });
 
-      // Update projectiles
-      projectiles.forEach((projectile, index) => {
-        projectile.position.add(projectile.velocity);
-
-        // Remove projectiles that go too far
-        if (projectile.position.length() > 50) {
-          scene.remove(projectile);
-          projectiles.splice(index, 1);
-        }
-
-        // Check collision with enemies
-        enemies.forEach((enemy, enemyIndex) => {
-          if (projectile.position.distanceTo(enemy.position) < 1) {
-            scene.remove(enemy);
-            scene.remove(projectile);
-            enemies.splice(enemyIndex, 1);
-            projectiles.splice(index, 1);
-            score += 100;
-            document.getElementById('score').textContent = score;
-          }
-        });
-      });
-
       renderer.render(scene, camera);
     }
 
-    // Handle window resize
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
