@@ -1,5 +1,6 @@
 <html>
 <head>
+  <base href="." />
   <meta charset="UTF-8">
   <title>Top Down 3D Shooter with Upgrades</title>
   <style>
@@ -7,6 +8,7 @@
       margin: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
+      background: #000;
     }
     #gameCanvas {
       width: 100vw;
@@ -32,6 +34,40 @@
       background: #ff3333;
       transition: width 0.3s;
     }
+    #upgradeBar {
+      position: fixed;
+      top: 50%;
+      left: 20px;
+      width: 20px;
+      height: 300px;
+      background-color: #444;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #upgradeMenu {
+      position: fixed;
+      top: 50%;
+      left: 100px;
+      width: 200px;
+      background-color: rgba(0, 0, 0, 0.8);
+      padding: 10px;
+      display: none;
+      border-radius: 5px;
+      box-shadow: 0 0 10px #fff;
+    }
+    .upgradeButton {
+      width: 100%;
+      padding: 10px;
+      background-color: #222;
+      color: #fff;
+      margin-bottom: 5px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+    }
+    .upgradeButton:hover {
+      background-color: #555;
+    }
   </style>
 </head>
 <body>
@@ -41,9 +77,17 @@
   </div>
   <canvas id="gameCanvas"></canvas>
 
+  <div id="upgradeBar"></div>
+  <div id="upgradeMenu">
+    <button class="upgradeButton" id="upgradeSpeed">Speed - Cost: 100</button>
+    <button class="upgradeButton" id="upgradeHealth">Health - Cost: 200</button>
+    <button class="upgradeButton" id="upgradeDamage">Damage - Cost: 150</button>
+    <button class="upgradeButton" id="upgradeSpinBall">Spinning Ball - Cost: 500</button>
+    <button class="upgradeButton" id="closeMenu">Close</button>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // Set up the scene, camera, and renderer
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({
@@ -54,16 +98,16 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Lighting setup
-    const ambientLight = new THREE.AmbientLight(0x404040, 1);
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x404040, 1); // Adjusted intensity
     scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(5, 5, 5);
-    directionalLight.castShadow = true;
+    directionalLight.position.set(5, 5, 5).normalize(); // Normalized position
+    directionalLight.castShadow = true;  // Enable shadow
     scene.add(directionalLight);
 
-    // Player setup
+    // Player
     const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
     const playerMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
     const player = new THREE.Mesh(playerGeometry, playerMaterial);
@@ -72,62 +116,99 @@
     player.receiveShadow = true;
     scene.add(player);
 
-    // Camera setup
-    camera.position.set(0, 10, 10);
-    camera.lookAt(new THREE.Vector3(0, 0, 0));
+    // Spinning ball
+    let spinningBall = null;
 
-    // Floor texture (Garfield image)
-    const floorTexture = new THREE.TextureLoader().load('garfield.png');
-    const floorGeometry = new THREE.PlaneGeometry(50, 50);
-    const floorMaterial = new THREE.MeshBasicMaterial({ map: floorTexture });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.5;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    // Game state variables
+    // Game state
     let score = 0;
     let health = 100;
     let enemies = [];
+    let money = 0;
     let lastEnemySpawn = 0;
-    let playerSpeed = 0.2;
-    camera.position.set(0, 20, 0);
-    camera.lookAt(0, 0, 0);
+    const enemySpeed = 0.05;
+    camera.position.set(0, 20, 50);  // Adjusted camera for better view
+    camera.lookAt(player.position); // Ensure camera looks at player
 
-    // Upgrade system variables
+    // Upgrade system
+    let gamePaused = false;
     let upgradeCosts = {
       speed: 100,
       health: 200,
       damage: 150,
-      multishot: 500
+      spinBall: 500
     };
     let upgradeMultipliers = {
       speed: 1.1,
       health: 1.25,
       damage: 1.2
     };
-    let multishotLevel = 0;
 
-    // Movement and key events
-    const keys = {};
-    window.addEventListener('keydown', (e) => keys[e.key] = true);
-    window.addEventListener('keyup', (e) => keys[e.key] = false);
-
-    // Move player function
-    function movePlayer() {
-      if (keys['w']) player.position.z -= playerSpeed;
-      if (keys['s']) player.position.z += playerSpeed;
-      if (keys['a']) player.position.x -= playerSpeed;
-      if (keys['d']) player.position.x += playerSpeed;
+    // Game functions
+    function togglePause() {
+      gamePaused = !gamePaused;
+      if (gamePaused) {
+        document.getElementById('upgradeMenu').style.display = 'block';
+        cancelAnimationFrame(animationId);
+      } else {
+        document.getElementById('upgradeMenu').style.display = 'none';
+        animate();
+      }
     }
 
-    // Enemy creation function
+    // Add event listener to the upgrade bar
+    document.getElementById('upgradeBar').addEventListener('click', togglePause);
+
+    // Upgrade handling
+    function applyUpgrade(upgrade) {
+      if (score >= upgradeCosts[upgrade]) {
+        score -= upgradeCosts[upgrade];
+        document.getElementById('score').textContent = score;
+        
+        // Apply the upgrade
+        if (upgrade === 'speed') {
+          player.position.x += upgradeMultipliers[upgrade];
+          upgradeCosts[upgrade] *= 1.25;
+          document.getElementById('upgradeSpeed').textContent = `Speed - Cost: ${Math.round(upgradeCosts[upgrade])}`;
+        } else if (upgrade === 'health') {
+          health += 10 * upgradeMultipliers[upgrade];
+          document.getElementById('health').style.width = health + '%';
+          upgradeCosts[upgrade] *= 1.25;
+          document.getElementById('upgradeHealth').textContent = `Health - Cost: ${Math.round(upgradeCosts[upgrade])}`;
+        } else if (upgrade === 'damage') {
+          upgradeCosts[upgrade] *= 1.25;
+          document.getElementById('upgradeDamage').textContent = `Damage - Cost: ${Math.round(upgradeCosts[upgrade])}`;
+        } else if (upgrade === 'spinBall') {
+          if (!spinningBall) {
+            createSpinningBall();
+          }
+          upgradeCosts[upgrade] *= 1.25;
+          document.getElementById('upgradeSpinBall').textContent = `Spinning Ball - Cost: ${Math.round(upgradeCosts[upgrade])}`;
+        }
+      }
+    }
+
+    // Button actions
+    document.getElementById('upgradeSpeed').addEventListener('click', () => applyUpgrade('speed'));
+    document.getElementById('upgradeHealth').addEventListener('click', () => applyUpgrade('health'));
+    document.getElementById('upgradeDamage').addEventListener('click', () => applyUpgrade('damage'));
+    document.getElementById('upgradeSpinBall').addEventListener('click', () => applyUpgrade('spinBall'));
+    document.getElementById('closeMenu').addEventListener('click', togglePause);
+
+    // Create spinning ball around player
+    function createSpinningBall() {
+      const ballGeometry = new THREE.SphereGeometry(0.5);
+      const ballMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+      spinningBall = new THREE.Mesh(ballGeometry, ballMaterial);
+      scene.add(spinningBall);
+    }
+
+    // Enemy creation
     function createEnemy() {
-      const enemyType = Math.random() < 0.2 ? 'yellow' : 'red';  // 20% chance for yellow enemies
+      const isYellow = Math.random() < 0.2; // 20% chance for yellow enemy
       const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const enemyMaterial = new THREE.MeshPhongMaterial({ color: enemyType === 'yellow' ? 0xffff00 : 0xff0000 });
+      const enemyMaterial = new THREE.MeshPhongMaterial({ color: isYellow ? 0xffff00 : 0xff0000 });
       const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+      enemy.health = isYellow ? 200 : 100; // Double health for yellow enemies
       const side = Math.floor(Math.random() * 4);
       switch (side) {
         case 0: enemy.position.set(-25, 0.5, Math.random() * 50 - 25); break;
@@ -135,87 +216,54 @@
         case 2: enemy.position.set(Math.random() * 50 - 25, 0.5, -25); break;
         case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
       }
-      enemy.health = enemyType === 'yellow' ? 2 : 1;  // Double health for yellow enemies
       enemy.castShadow = true;
       enemy.receiveShadow = true;
       scene.add(enemy);
       enemies.push(enemy);
     }
 
-    // Enemy update and collision handling
-    function updateEnemies() {
-      enemies.forEach((enemy) => {
-        const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
-        enemy.position.add(direction.multiplyScalar(0.05));  // Slow enemy movement towards player
-
-        // Enemy collision detection with player
-        if (enemy.position.distanceTo(player.position) < 1) {
-          health -= 10;
-          document.getElementById('health').style.width = health + '%';
-          if (health <= 0) {
-            alert('Game Over! Score: ' + score);
-            location.reload();
-          }
-        }
-      });
-    }
-
-    // Upgrade function
-    function applyUpgrade(upgrade) {
-      if (score >= upgradeCosts[upgrade]) {
-        score -= upgradeCosts[upgrade];
-        document.getElementById('score').textContent = score;
-
-        // Apply upgrade based on type
-        if (upgrade === 'speed') {
-          playerSpeed *= upgradeMultipliers[upgrade];
-        } else if (upgrade === 'health') {
-          health += 10 * upgradeMultipliers[upgrade];
-          document.getElementById('health').style.width = health + '%';
-        } else if (upgrade === 'damage') {
-          // Damage upgrade logic (can increase bullet power)
-        } else if (upgrade === 'multishot') {
-          multishotLevel++;
-          upgradeCosts[upgrade] *= 1.5;  // Increase multishot upgrade cost after purchase
-        }
-      }
-    }
-
-    // Upgrade buttons (and the "multishot" upgrade)
-    document.getElementById('upgradeSpeed').addEventListener('click', () => applyUpgrade('speed'));
-    document.getElementById('upgradeHealth').addEventListener('click', () => applyUpgrade('health'));
-    document.getElementById('upgradeDamage').addEventListener('click', () => applyUpgrade('damage'));
-    document.getElementById('upgradeMultishot').addEventListener('click', () => applyUpgrade('multishot'));
-
-    // Game loop function
+    // Game loop
+    let animationId;
     function animate() {
-      requestAnimationFrame(animate);
+      if (gamePaused) return;
 
-      // Handle player movement
-      movePlayer();
+      animationId = requestAnimationFrame(animate);
 
-      // Spawn enemies every few seconds
-      if (Date.now() - lastEnemySpawn > 2000) {
-        createEnemy();
-        lastEnemySpawn = Date.now();
+      // Update player movement
+      if (keys['w']) player.position.z -= 0.2;
+      if (keys['s']) player.position.z += 0.2;
+      if (keys['a']) player.position.x -= 0.2;
+      if (keys['d']) player.position.x += 0.2;
+
+      // Update spinning ball (if any)
+      if (spinningBall) {
+        const time = Date.now() * 0.001;
+        spinningBall.position.set(
+          player.position.x + 2 * Math.cos(time),
+          player.position.y + 1,
+          player.position.z + 2 * Math.sin(time)
+        );
       }
 
-      // Update enemy positions and handle collisions
-      updateEnemies();
+      // Spawn enemies
+      if (Date.now() - lastEnemySpawn > 1000) {
+        lastEnemySpawn = Date.now();
+        createEnemy();
+      }
 
       // Render the scene
       renderer.render(scene, camera);
     }
 
-    // Start the game loop
-    animate();
-
-    // Window resizing handling
+    // Handle window resizing
     window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
     });
+
+    // Start the game
+    animate();
   </script>
 </body>
 </html>
