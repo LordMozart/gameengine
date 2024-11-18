@@ -1,4 +1,8 @@
-<html><head><base href="." /><meta charset="UTF-8"><title>Top Down 3D Shooter</title>
+<html>
+<head>
+<base href="." />
+<meta charset="UTF-8">
+<title>Top Down 3D Shooter</title>
 <style>
     body { margin: 0; overflow: hidden; }
     #health-bar {
@@ -247,200 +251,81 @@ function startNewWave() {
     }
 }
 
-function removeEnemy(enemy) {
-    const healthBar = enemyHealthBars.get(enemy);
-    if (healthBar) {
-        healthBar.remove();
-        enemyHealthBars.delete(enemy);
-    }
-    scene.remove(enemy);
-    const index = enemies.indexOf(enemy);
-    if (index > -1) {
-        enemies.splice(index, 1);
+// Check if wave is complete
+function checkWaveCompletion() {
+    if (enemies.length === 0 && enemiesLeftToSpawn === 0 && !isSpawning) {
+        currentWave++; // Increment wave after completion
+        showUpgrades();
     }
 }
 
 function showUpgrades() {
-    document.getElementById('upgrades').style.display = 'block';
-    renderer.domElement.style.filter = 'blur(5px)';
+    const upgradesMenu = document.getElementById('upgrades');
+    upgradesMenu.style.display = 'block';
+    setTimeout(() => { upgradesMenu.style.display = 'none'; }, 5000); // Hide after 5 seconds
 }
 
-function applyUpgrade(type) {
-    switch(type) {
-        case 'damage':
-            projectileDamage += 10;
-            break;
-        case 'health':
-            maxHealth += 20;
-            playerHealth = maxHealth;
-            updateHealthBar();
-            break;
-        case 'speed':
-            moveSpeed *= 1.1;
-            break;
+function applyUpgrade(upgradeType) {
+    if (upgradeType === 'damage') {
+        projectileDamage += 10;
+    } else if (upgradeType === 'health') {
+        maxHealth += 20;
+        playerHealth = maxHealth; // Restore health on upgrade
+    } else if (upgradeType === 'speed') {
+        moveSpeed *= 1.1; // Increase speed by 10%
     }
-    document.getElementById('upgrades').style.display = 'none';
-    renderer.domElement.style.filter = 'none';
-    startNewWave();
 }
 
-// Event listeners
-window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
-
-window.addEventListener('click', (event) => {
-    if (document.getElementById('upgrades').style.display === 'block') return;
-    
-    const mousePosition = new THREE.Vector2(
-        (event.clientX / window.innerWidth) * 2 - 1,
-        -(event.clientY / window.innerHeight) * 2 + 1
-    );
-    
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mousePosition, camera);
-    
-    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const targetPoint = new THREE.Vector3();
-    raycaster.ray.intersectPlane(floorPlane, targetPoint);
-    
-    const projectileGeometry = new THREE.SphereGeometry(0.2);
-    const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
-    const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-    projectile.position.copy(player.position);
-    
-    const direction = new THREE.Vector3()
-        .subVectors(targetPoint, player.position)
-        .normalize();
-    
-    projectile.velocity = direction.multiplyScalar(0.5);
-    
-    scene.add(projectile);
-    projectiles.push(projectile);
+// Player movement
+document.addEventListener('keydown', (event) => {
+    keys[event.key] = true;
+});
+document.addEventListener('keyup', (event) => {
+    keys[event.key] = false;
 });
 
-camera.position.set(0, 15, 0);
-camera.lookAt(0, 0, 0);
-
-function updateHealthBar() {
-    const healthFill = document.getElementById('health-fill');
-    healthFill.style.width = `${(playerHealth / maxHealth) * 100}%`;
+// Player shooting function
+function shoot() {
+    const direction = new THREE.Vector3(0, 0, -1);
+    const projectileGeometry = new THREE.SphereGeometry(0.2);
+    const projectileMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+    projectile.position.set(player.position.x, player.position.y + 0.5, player.position.z);
+    projectile.velocity = direction.multiplyScalar(0.5);
+    scene.add(projectile);
+    projectiles.push(projectile);
 }
 
+// Animation loop
 function animate() {
     requestAnimationFrame(animate);
     
-    // Player movement
+    // Player movement and other updates
     if (keys['w']) player.position.z -= moveSpeed;
     if (keys['s']) player.position.z += moveSpeed;
     if (keys['a']) player.position.x -= moveSpeed;
     if (keys['d']) player.position.x += moveSpeed;
     
-    // Boundary check for player
-    player.position.x = Math.max(-BOUNDARY_SIZE, Math.min(BOUNDARY_SIZE, player.position.x));
-    player.position.z = Math.max(-BOUNDARY_SIZE, Math.min(BOUNDARY_SIZE, player.position.z));
-    
-    // Update projectiles
-    for (let i = projectiles.length - 1; i >= 0; i--) {
-        const projectile = projectiles[i];
+    // Update projectiles and enemies
+    projectiles.forEach((projectile, index) => {
         projectile.position.add(projectile.velocity);
-        
-        if (projectile.position.length() > 50) {
+        if (projectile.position.x > BOUNDARY_SIZE || projectile.position.x < -BOUNDARY_SIZE || 
+            projectile.position.z > BOUNDARY_SIZE || projectile.position.z < -BOUNDARY_SIZE) {
             scene.remove(projectile);
-            projectiles.splice(i, 1);
-            continue;
+            projectiles.splice(index, 1);
         }
-        
-        for (let j = enemies.length - 1; j >= 0; j--) {
-            const enemy = enemies[j];
-            if (projectile.position.distanceTo(enemy.position) < 1) {
-                enemy.health -= projectileDamage;
-                scene.remove(projectile);
-                projectiles.splice(i, 1);
-                
-                if (enemy.health <= 0) {
-                    removeEnemy(enemy);
-                } else {
-                    updateEnemyHealthBar(enemy);
-                }
-                break;
-            }
-        }
-    }
+    });
     
-    // Update enemies
-    for (const enemy of enemies) {
-        if (enemy.isRanged) {
-            // Ranged enemies maintain distance and shoot
-            const distanceToPlayer = enemy.position.distanceTo(player.position);
-            if (distanceToPlayer < 15) {
-                // Move away if too close
-                const direction = new THREE.Vector3()
-                    .subVectors(enemy.position, player.position)
-                    .normalize();
-                enemy.position.add(direction.multiplyScalar(enemy.speed));
-            } else if (distanceToPlayer > 20) {
-                // Move closer if too far
-                const direction = new THREE.Vector3()
-                    .subVectors(player.position, enemy.position)
-                    .normalize();
-                enemy.position.add(direction.multiplyScalar(enemy.speed));
-            }
-
-            // Shoot at intervals
-            const currentTime = Date.now();
-            if (currentTime - enemy.lastShot > 2000) { // Shoot every 2 seconds
-                enemyShoot(enemy);
-                enemy.lastShot = currentTime;
-            }
-        } else {
-            // Melee enemies chase player
-            const direction = new THREE.Vector3()
-                .subVectors(player.position, enemy.position)
-                .normalize();
-            enemy.position.add(direction.multiplyScalar(enemy.speed));
+    enemies.forEach(enemy => {
+        if (enemy.health <= 0) {
+            scene.remove(enemy);
+            enemies.splice(enemies.indexOf(enemy), 1);
         }
-        
         updateEnemyHealthBar(enemy);
-        
-        if (!enemy.isRanged && enemy.position.distanceTo(player.position) < 1) {
-            playerHealth -= 1;
-            updateHealthBar();
-            if (playerHealth <= 0) {
-                alert('Game Over!');
-                location.reload();
-            }
-        }
-    }
+    });
     
-    // Update enemy projectiles
-    for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
-        const projectile = enemyProjectiles[i];
-        projectile.position.add(projectile.velocity);
-        
-        if (projectile.position.length() > 50) {
-            scene.remove(projectile);
-            enemyProjectiles.splice(i, 1);
-            continue;
-        }
-        
-        if (projectile.position.distanceTo(player.position) < 1) {
-            playerHealth -= projectile.damage;
-            updateHealthBar();
-            scene.remove(projectile);
-            enemyProjectiles.splice(i, 1);
-            
-            if (playerHealth <= 0) {
-                alert('Game Over!');
-                location.reload();
-            }
-        }
-    }
-
     // Check if wave is complete
-    if (enemies.length === 0 && enemiesLeftToSpawn === 0 && !isSpawning) {
-        currentWave++;
-        showUpgrades();
-    }
+    checkWaveCompletion();
     
     renderer.render(scene, camera);
 }
