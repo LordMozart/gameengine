@@ -231,17 +231,13 @@
 
             // Update enemy health bar
             if (enemy.healthBar) {
-                enemy.healthBar.style.width = ${(enemy.health / 100) * 40}px;
+                enemy.healthBar.style.width = `${(enemy.health / 100) * 40}px`; // Fix applied here
             }
 
             // Check collision with player
             if (enemy.position.distanceTo(player.position) < 1) {
                 health -= 10;
                 document.getElementById('health').style.width = health + '%';
-                if (health <= 0) {
-                    alert('Game Over! Score: ' + score);
-                    location.reload();
-                }
             }
         });
 
@@ -249,39 +245,35 @@
         projectiles.forEach((projectile, index) => {
             projectile.position.add(projectile.velocity);
 
-            // Remove projectiles that go too far
+            // Check collision with enemies
+            enemies.forEach((enemy, enemyIndex) => {
+                if (projectile.position.distanceTo(enemy.position) < 1) {
+                    enemy.health -= 10;
+                    if (enemy.health <= 0) {
+                        kills++;
+                        document.getElementById('killCountValue').innerText = kills;
+                        scene.remove(enemy);
+                        clearInterval(enemy.shootInterval); // Stop shooting if enemy dies
+                        enemies.splice(enemyIndex, 1);
+                    }
+                    scene.remove(projectile);
+                    projectiles.splice(index, 1);
+                }
+            });
+
+            // Remove projectile if it exceeds distance
             if (projectile.position.length() > 50) {
                 scene.remove(projectile);
                 projectiles.splice(index, 1);
             }
-
-            // Check collision with enemies
-            enemies.forEach((enemy, enemyIndex) => {
-                if (projectile.position.distanceTo(enemy.position) < 1) {
-                    enemy.health -= 20;
-                    if (enemy.health <= 0) {
-                        kills++;
-                        document.getElementById('killCountValue').textContent = kills;
-                        scene.remove(enemy);
-                        scene.remove(projectile);
-                        enemies.splice(enemyIndex, 1);
-                        projectiles.splice(index, 1);
-                        money += 500;
-                    }
-                }
-            });
         });
+
+        // Update score and game status
+        document.getElementById('score').innerText = score;
 
         // Render the scene
         renderer.render(scene, camera);
     }
-
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
 
     animate();
 </script>
