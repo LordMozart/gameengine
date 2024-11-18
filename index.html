@@ -210,6 +210,15 @@
             case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
         }
 
+        // Adding enemy health bar
+        const healthBar = document.createElement('div');
+        healthBar.className = 'enemyHealthBar';
+        const healthDiv = document.createElement('div');
+        healthDiv.className = 'enemyHealth';
+        healthBar.appendChild(healthDiv);
+        document.body.appendChild(healthBar);
+        enemy.healthBar = healthBar;
+        enemy.health = 100; // Initialize enemy health
         scene.add(enemy);
         enemies.push(enemy);
     }
@@ -223,106 +232,32 @@
             const projectileGeometry = new THREE.SphereGeometry(0.2);
             const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
             const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            projectile.position.copy(startPosition);
-            projectile.velocity = direction.normalize().multiplyScalar(0.5);
-            projectile.castShadow = true;
-            scene.add(projectile);
+            projectile.position.set(startPosition.x, startPosition.y + 1, startPosition.z);
+            projectile.velocity = direction.multiplyScalar(0.5);
             projectiles.push(projectile);
+            scene.add(projectile);
         }
     }
 
-    // Upgrade panel
-    const upgradeButton = document.getElementById('upgradeButton');
-    const upgradePanel = document.getElementById('upgradePanel');
-    
-    upgradeButton.addEventListener('click', () => {
-        if (upgradePanel.style.display === "none") {
-            upgradePanel.style.display = "block";
-        } else {
-            upgradePanel.style.display = "none";
-        }
-    });
-
-    // Speed upgrade
-    document.getElementById('speedUpgrade').addEventListener('click', () => {
-        if (money >= 500 && !upgradeBought.speed) {
-            money -= 500;
-            upgradeBought.speed = true;
-            playerSpeed += 0.1; // Increase player speed
-            alert("Speed Upgrade Purchased!");
-        } else {
-            alert("Not enough money or upgrade already bought!");
-        }
-    });
-
-    // Damage upgrade
-    document.getElementById('damageUpgrade').addEventListener('click', () => {
-        if (money >= 1000 && !upgradeBought.damage) {
-            money -= 1000;
-            upgradeBought.damage = true;
-            playerDamage += 5; // Increase player damage
-            alert("Damage Upgrade Purchased!");
-        } else {
-            alert("Not enough money or upgrade already bought!");
-        }
-    });
-
-    // Health upgrade
-    document.getElementById('healthUpgrade').addEventListener('click', () => {
-        if (money >= 1500 && !upgradeBought.health) {
-            money -= 1500;
-            upgradeBought.health = true;
-            health += 50; // Increase player health
-            alert("Health Upgrade Purchased!");
-        } else {
-            alert("Not enough money or upgrade already bought!");
-        }
-    });
-
-    // Shield upgrade
-    document.getElementById('shieldUpgrade').addEventListener('click', () => {
-        if (money >= 2000 && !upgradeBought.shield) {
-            money -= 2000;
-            upgradeBought.shield = true;
-            shield += 50; // Increase shield
-            alert("Shield Upgrade Purchased!");
-        } else {
-            alert("Not enough money or upgrade already bought!");
-        }
-    });
-
-    // Shoot speed upgrade
-    document.getElementById('shootSpeedUpgrade').addEventListener('click', () => {
-        if (money >= 3000 && !upgradeBought.shootSpeed) {
-            money -= 3000;
-            upgradeBought.shootSpeed = true;
-            shootCooldown = 0.2; // Reduce shoot cooldown
-            alert("Shoot Speed Upgrade Purchased!");
-        } else {
-            alert("Not enough money or upgrade already bought!");
-        }
-    });
-
-    // Game loop
+    // Animation loop
     function animate() {
         requestAnimationFrame(animate);
 
-        // Player movement
-        if (keys['w']) player.position.z -= playerSpeed;
-        if (keys['s']) player.position.z += playerSpeed;
-        if (keys['a']) player.position.x -= playerSpeed;
-        if (keys['d']) player.position.x += playerSpeed;
-
-        // Update enemies and their health
+        // Handle enemy movement and shooting
         enemies.forEach(enemy => {
-            const direction = new THREE.Vector3()
-                .subVectors(player.position, enemy.position)
-                .normalize();
+            const direction = new THREE.Vector3().subVectors(player.position, enemy.position).normalize();
             enemy.position.add(direction.multiplyScalar(0.05));
 
             // Update enemy health bar
             if (enemy.healthBar) {
+                enemy.healthBar.style.left = `${enemy.position.x}px`;
+                enemy.healthBar.style.top = `${enemy.position.y + 1}px`;
                 enemy.healthBar.style.width = `${(enemy.health / 100) * 40}px`;
+            }
+
+            // Random chance to shoot
+            if (Math.random() < 0.01) {
+                shoot(direction, enemy.position);
             }
         });
 
@@ -339,8 +274,21 @@
         renderer.render(scene, camera);
     }
 
+    // Handle player movement
+    let keys = {};
+    window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
     // Start game loop
     animate();
+
+    // Spawn enemies periodically
+    setInterval(() => {
+        if (Math.random() < 0.5) {
+            createEnemy(); // 50% chance to spawn enemy
+        }
+    }, 2000);
+
 </script>
 </body>
 </html>
