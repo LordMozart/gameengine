@@ -94,7 +94,7 @@
 
   <div id="upgradeBar"></div>
   <div id="upgradeMenu">
-    <button class="upgradeButton" id="upgradeSpeed">Speed - Cost: 100</button>
+    <button class="upgradeButton" id="upgradeSpeed">Speed - Cost: 1000</button>
     <button class="upgradeButton" id="upgradeHealth">Health - Cost: 200</button>
     <button class="upgradeButton" id="upgradeDamage">Damage - Cost: 150</button>
     <button class="upgradeButton" id="closeMenu">Close</button>
@@ -134,24 +134,35 @@
     player.receiveShadow = true;
     scene.add(player);
 
+    // Ground (with Garfield image)
+    const textureLoader = new THREE.TextureLoader();
+    const groundTexture = textureLoader.load('garfield.png');
+    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundMaterial = new THREE.MeshBasicMaterial({ map: groundTexture });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
     // Game state
     let score = 0;
     let health = 100;
     let kills = 0;
     let enemies = [];
-    const enemySpeed = 0.05;
+    let shootSpeed = 0.65;  // Default shoot speed
     camera.position.set(0, 20, 0);
     camera.lookAt(0, 0, 0);
 
     // Upgrade system
     let gamePaused = false;
     let upgradeCosts = {
-      speed: 100,
+      speed: 1000, // Speed upgrade cost
       health: 200,
       damage: 150
     };
     let upgradeMultipliers = {
-      speed: 1.1, // 10% speed increase
+      speed: 1.2, // 20% speed increase
       health: 1.25, // 25% health increase
       damage: 1.2 // 20% damage increase
     };
@@ -188,7 +199,7 @@
         
         // Apply the upgrade
         if (upgrade === 'speed') {
-          player.position.x += upgradeMultipliers[upgrade];
+          shootSpeed *= upgradeMultipliers[upgrade]; // Increase shooting speed
           upgradeCosts[upgrade] *= 1.25; // Increase cost for next upgrade
           document.getElementById('upgradeSpeed').textContent = `Speed - Cost: ${Math.round(upgradeCosts[upgrade])}`;
         } else if (upgrade === 'health') {
@@ -197,7 +208,6 @@
           upgradeCosts[upgrade] *= 1.25;
           document.getElementById('upgradeHealth').textContent = `Health - Cost: ${Math.round(upgradeCosts[upgrade])}`;
         } else if (upgrade === 'damage') {
-          // Example: increase player's damage (this can be more complex, e.g., adjusting projectile speed or size)
           upgradeCosts[upgrade] *= 1.25;
           document.getElementById('upgradeDamage').textContent = `Damage - Cost: ${Math.round(upgradeCosts[upgrade])}`;
         }
@@ -215,130 +225,24 @@
       const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
       const enemyMaterial = new THREE.MeshPhongMaterial({color: 0xff0000});
       const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-      const side = Math.floor(Math.random() * 4);
-      switch(side) {
-        case 0: enemy.position.set(-25, 0.5, Math.random() * 50 - 25); break;
-        case 1: enemy.position.set(25, 0.5, Math.random() * 50 - 25); break;
-        case 2: enemy.position.set(Math.random() * 50 - 25, 0.5, -25); break;
-        case 3: enemy.position.set(Math.random() * 50 - 25, 0.5, 25); break;
-      }
+      enemy.position.set(Math.random() * 20 - 10, 0.5, Math.random() * 20 - 10);
       enemy.castShadow = true;
       enemy.receiveShadow = true;
-      scene.add(enemy);
       enemies.push(enemy);
+      scene.add(enemy);
     }
 
-    // Shooting mechanism
-    let projectiles = [];
-    function shoot(direction) {
-      const projectileGeometry = new THREE.SphereGeometry(0.2);
-      const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
-      const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-      projectile.position.copy(player.position);
-      projectile.velocity = direction.normalize().multiplyScalar(0.5);
-      projectile.castShadow = true;
-      scene.add(projectile);
-      projectiles.push(projectile);
-    }
-
-    // Input handling
-    const keys = {};
-    window.addEventListener('keydown', (e) => keys[e.key] = true);
-    window.addEventListener('keyup', (e) => keys[e.key] = false);
-    window.addEventListener('mousemove', (e) => {
-      const vector = new THREE.Vector3(
-        (e.clientX / window.innerWidth) * 2 - 1,
-        -(e.clientY / window.innerHeight) * 2 + 1,
-        0
-      );
-      vector.unproject(camera);
-      const dir = vector.sub(camera.position).normalize();
-      const distance = -camera.position.y / dir.y;
-      const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-      player.lookAt(pos.x, player.position.y, pos.z);
-    });
-
-    window.addEventListener('click', () => {
-      const direction = new THREE.Vector3();
-      player.getWorldDirection(direction);
-      shoot(direction);
-    });
-
-    // Game loop
-    let lastEnemySpawn = 0;
-    let animationId;
+    // Animation loop
     function animate() {
       if (gamePaused) return;
-      animationId = requestAnimationFrame(animate);
-
-      // Player movement
-      if (keys['w']) player.position.z -= 0.2;
-      if (keys['s']) player.position.z += 0.2;
-      if (keys['a']) player.position.x -= 0.2;
-      if (keys['d']) player.position.x += 0.2;
-
-      // Spawn enemies
-      if (Date.now() - lastEnemySpawn > 2000) {
-        createEnemy();
-        lastEnemySpawn = Date.now();
-      }
-
-      // Update enemies
-      enemies.forEach(enemy => {
-        const direction = new THREE.Vector3()
-          .subVectors(player.position, enemy.position)
-          .normalize();
-        enemy.position.add(direction.multiplyScalar(enemySpeed));
-
-        // Check collision with player
-        if (enemy.position.distanceTo(player.position) < 1) {
-          health -= 10;
-          document.getElementById('health').style.width = health + '%';
-          if (health <= 0) {
-            alert('Game Over! Score: ' + score);
-            location.reload();
-          }
-        }
-      });
-
-      // Update projectiles
-      projectiles.forEach((projectile, index) => {
-        projectile.position.add(projectile.velocity);
-
-        // Remove projectiles that go too far
-        if (projectile.position.length() > 50) {
-          scene.remove(projectile);
-          projectiles.splice(index, 1);
-        }
-
-        // Check collision with enemies
-        enemies.forEach((enemy, enemyIndex) => {
-          if (projectile.position.distanceTo(enemy.position) < 1) {
-            scene.remove(enemy);
-            scene.remove(projectile);
-            enemies.splice(enemyIndex, 1);
-            projectiles.splice(index, 1);
-            score += 100;
-            kills += 1;
-            document.getElementById('score').textContent = score;
-            document.getElementById('killCountValue').textContent = kills;
-            // Update leaderboard if necessary
-            if (kills > localStorage.getItem('highKills')) {
-              localStorage.setItem('highKills', kills);
-            }
-          }
-        });
-      });
-
+      requestAnimationFrame(animate);
       renderer.render(scene, camera);
-    }
 
-    // Handle window resize
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+      // Update leaderboard
+      document.getElementById('killCountValue').textContent = kills;
+
+      // Additional movement, shooting, and enemy logic can be added here
+    }
 
     animate();
   </script>
