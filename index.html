@@ -107,6 +107,11 @@
     directionalLight.castShadow = true;  // Enable shadow
     scene.add(directionalLight);
 
+    // Adding more lighting to ensure visibility
+    const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+    pointLight.position.set(10, 10, 10);
+    scene.add(pointLight);
+
     // Player
     const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
     const playerMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
@@ -128,6 +133,10 @@
     const enemySpeed = 0.05;
     camera.position.set(0, 20, 50);  // Adjusted camera for better view
     camera.lookAt(player.position); // Ensure camera looks at player
+
+    // Log the camera position for debugging
+    console.log(camera.position); // Check if camera is positioned correctly
+    console.log(player.position); // Check if player is correctly placed
 
     // Upgrade system
     let gamePaused = false;
@@ -218,51 +227,56 @@
       }
       enemy.castShadow = true;
       enemy.receiveShadow = true;
-      scene.add(enemy);
       enemies.push(enemy);
+      scene.add(enemy);
     }
 
-    // Game loop
-    let animationId;
+    // Animate the scene
     function animate() {
       if (gamePaused) return;
-
-      animationId = requestAnimationFrame(animate);
-
-      // Update player movement
-      if (keys['w']) player.position.z -= 0.2;
-      if (keys['s']) player.position.z += 0.2;
-      if (keys['a']) player.position.x -= 0.2;
-      if (keys['d']) player.position.x += 0.2;
-
-      // Update spinning ball (if any)
+      requestAnimationFrame(animate);
+      
+      // Player controls
+      if (keys['w']) player.position.z -= 0.1;
+      if (keys['s']) player.position.z += 0.1;
+      if (keys['a']) player.position.x -= 0.1;
+      if (keys['d']) player.position.x += 0.1;
+      
+      // Spin the ball if it exists
       if (spinningBall) {
-        const time = Date.now() * 0.001;
-        spinningBall.position.set(
-          player.position.x + 2 * Math.cos(time),
-          player.position.y + 1,
-          player.position.z + 2 * Math.sin(time)
-        );
+        spinningBall.rotation.x += 0.05;
+        spinningBall.rotation.y += 0.05;
       }
 
-      // Spawn enemies
-      if (Date.now() - lastEnemySpawn > 1000) {
-        lastEnemySpawn = Date.now();
+      // Update enemies and check for collisions
+      const now = Date.now();
+      if (now - lastEnemySpawn > 2000) {
         createEnemy();
+        lastEnemySpawn = now;
       }
+
+      // Update enemies
+      enemies.forEach(enemy => {
+        enemy.position.z += enemySpeed;
+        if (enemy.position.z > 50) {
+          enemy.position.z = -50;
+        }
+      });
 
       // Render the scene
       renderer.render(scene, camera);
     }
 
-    // Handle window resizing
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
+    // Event listener for controls
+    const keys = {};
+    window.addEventListener('keydown', (event) => {
+      keys[event.key] = true;
+    });
+    window.addEventListener('keyup', (event) => {
+      keys[event.key] = false;
     });
 
-    // Start the game
+    // Start the animation
     animate();
   </script>
 </body>
