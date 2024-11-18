@@ -58,9 +58,17 @@
     // Lighting
     const ambientLight = new THREE.AmbientLight(0x404040);
     scene.add(ambientLight);
+
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 5, 5);
     directionalLight.castShadow = true;  // Enable shadow casting for the light
+    directionalLight.shadow.camera.left = -10;
+    directionalLight.shadow.camera.right = 10;
+    directionalLight.shadow.camera.top = 10;
+    directionalLight.shadow.camera.bottom = -10;
+    directionalLight.shadow.camera.near = 0.1;
+    directionalLight.shadow.camera.far = 50;
+    directionalLight.shadow.mapSize.set(1024, 1024); // Higher resolution shadows
     scene.add(directionalLight);
 
     // Player
@@ -85,6 +93,7 @@
     let health = 100;
     let enemies = [];
     let upgrades = [];
+    let lastEnemyShootTimes = {}; // Stores the last shot time for each enemy
     const enemySpeed = 0.05;
     const projectileSpeed = 0.5;
     camera.position.set(0, 20, 0);
@@ -110,6 +119,10 @@
       enemy.receiveShadow = true;  // Enable shadow receiving for enemies
       scene.add(enemy);
       enemies.push(enemy);
+      
+      if (type === 'ranged') {
+        lastEnemyShootTimes[enemy.uuid] = Date.now(); // Initialize shoot cooldown
+      }
     }
 
     // Ranged Enemy behavior (shooting)
@@ -198,9 +211,10 @@
       if (keys['a']) player.position.x -= 0.2;
       if (keys['d']) player.position.x += 0.2;
 
-      // Spawn enemies
+      // Spawn enemies (50% ranged)
       if (Date.now() - lastEnemySpawn > 2000) {
-        createEnemy('ranged');
+        const enemyType = Math.random() < 0.5 ? 'ranged' : 'melee';
+        createEnemy(enemyType);
         lastEnemySpawn = Date.now();
       }
 
@@ -216,7 +230,7 @@
           .subVectors(player.position, enemy.position)
           .normalize();
         enemy.position.add(direction.multiplyScalar(enemySpeed));
-        
+
         // Check collision with player
         if (enemy.position.distanceTo(player.position) < 1) {
           health -= 10;
@@ -227,9 +241,10 @@
           }
         }
 
-        // Enemy shooting
-        if (enemy.type === 'ranged' && Math.random() < 0.01) {
+        // Enemy shooting with cooldown
+        if (enemy.type === 'ranged' && Date.now() - lastEnemyShootTimes[enemy.uuid] > 200) {
           createEnemyProjectile(enemy);
+          lastEnemyShootTimes[enemy.uuid] = Date.now(); // Reset cooldown
         }
       });
 
