@@ -1,453 +1,491 @@
-<html><head><base href="." /><meta charset="UTF-8"><title>Top Down 3D Shooter</title>
-<style>
-    body { margin: 0; overflow: hidden; }
-    #health-bar {
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        width: 200px;
-        height: 20px;
-        background-color: #333;
-        border: 2px solid #fff;
-        z-index: 1000;
-    }
-    #health-fill {
-        width: 100%;
-        height: 100%;
-        background-color: #f00;
-        transition: width 0.3s ease;
-    }
-    #wave-title {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: white;
-        font-family: Arial, sans-serif;
-        font-size: 48px;
-        display: none;
-        text-align: center;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-    }
-    #wave-counter {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        color: white;
-        font-family: Arial, sans-serif;
-        font-size: 24px;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        z-index: 1000;
-    }
-    #upgrades {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0, 0, 0, 0.8);
-        padding: 20px;
-        border-radius: 10px;
-        display: none;
-        color: white;
-        font-family: Arial, sans-serif;
-        z-index: 2000;
-    }
-    .upgrade-btn {
-        display: block;
-        margin: 10px;
-        padding: 10px;
-        background: #4CAF50;
-        border: none;
-        color: white;
-        cursor: pointer;
-        border-radius: 5px;
-        width: 200px;
-    }
-    .upgrade-btn:hover {
-        background: #45a049;
-    }
-    .enemy-health-container {
-        position: absolute;
-        width: 50px;
-        height: 5px;
-        background-color: #333;
-        border: 1px solid #fff;
-        pointer-events: none;
-        transform: translate(-50%, -20px);
-    }
-    .enemy-health-fill {
-        width: 100%;
-        height: 100%;
-        background-color: #f00;
-        transition: width 0.1s ease;
-    }
-</style>
+<html>
+<head>
+    <base href="." />
+    <meta charset="UTF-8">
+    <title>Top Down 3D Shooter</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #health-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 200px;
+            height: 20px;
+            background-color: #333;
+            border: 2px solid #fff;
+            z-index: 1000;
+        }
+        #health-fill {
+            width: 100%;
+            height: 100%;
+            background-color: #f00;
+            transition: width 0.3s ease;
+        }
+        #shield-bar {
+            position: fixed;
+            bottom: 45px;
+            left: 20px;
+            width: 200px;
+            height: 20px;
+            background-color: #333;
+            border: 2px solid #fff;
+            z-index: 1000;
+            display: none; /* Initially hidden */
+        }
+        #shield-fill {
+            width: 100%;
+            height: 100%;
+            background-color: #00f; /* Blue for shield */
+            transition: width 0.3s ease;
+        }
+        #wave-title {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 48px;
+            display: none;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        #wave-counter {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        #upgrades {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            color: white;
+            font-family: Arial, sans-serif;
+            z-index: 2000;
+        }
+        .upgrade-btn {
+            display: block;
+            margin: 10px;
+            padding: 10px;
+            background: #4CAF50;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+            width: 200px;
+        }
+        .upgrade-btn:hover {
+            background: #45a049;
+        }
+        .enemy-health-container {
+            position: absolute;
+            width: 50px;
+            height: 5px;
+            background-color: #333;
+            border: 1px solid #fff;
+            pointer-events: none;
+            transform: translate(-50%, -20px);
+        }
+        .enemy-health-fill {
+            width: 100%;
+            height: 100%;
+            background-color: #f00;
+            transition: width 0.1s ease;
+        }
+    </style>
 </head>
 <body>
-<div id="health-bar"><div id="health-fill"></div></div>
-<div id="wave-title">Wave 1</div>
-<div id="wave-counter">Wave: 1</div>
-<div id="upgrades">
-    <h2>Choose an Upgrade</h2>
-    <button class="upgrade-btn" onclick="applyUpgrade('damage')">Increase Damage (+10)</button>
-    <button class="upgrade-btn" onclick="applyUpgrade('health')">Max Health +20</button>
-    <button class="upgrade-btn" onclick="applyUpgrade('speed')">Movement Speed +10%</button>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+    <div id="health-bar"><div id="health-fill"></div></div>
+    <div id="shield-bar"><div id="shield-fill"></div></div>
+    <div id="wave-title">Wave 1</div>
+    <div id="wave-counter">Wave: 1</div>
+    <div id="upgrades">
+        <h2>Choose an Upgrade</h2>
+        <button class="upgrade-btn" onclick="applyUpgrade('damage')">Increase Damage (+10)</button>
+        <button class="upgrade-btn" onclick="applyUpgrade('health')">Max Health +20</button>
+        <button class="upgrade-btn" onclick="applyUpgrade('speed')">Movement Speed +10%</button>
+        <button class="upgrade-btn" onclick="applyUpgrade('shield')">Unlock Shield (Available on Wave 10+)</button>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0x404040);
-scene.add(ambientLight);
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(10, 10, 10);
-scene.add(light);
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(10, 10, 10);
+        scene.add(light);
 
-// Floor
-const floorGeometry = new THREE.PlaneGeometry(50, 50);
-const floorMaterial = new THREE.MeshPhongMaterial({ color: 0x808080 });
-const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
+        // Floor
+        const floorGeometry = new THREE.PlaneGeometry(50, 50);
+        const floorMaterial = new THREE.MeshPhongMaterial({ color: 0x808080 });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
 
-// Player
-const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
-const playerMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-const player = new THREE.Mesh(playerGeometry, playerMaterial);
-player.position.y = 0.5;
-scene.add(player);
-let playerHealth = 100;
-let maxHealth = 100;
-let moveSpeed = 0.2;
-let projectileDamage = 34;
+        // Player
+        const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const playerMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+        const player = new THREE.Mesh(playerGeometry, playerMaterial);
+        player.position.y = 0.5;
+        scene.add(player);
+        let playerHealth = 100;
+        let maxHealth = 100;
+        let moveSpeed = 0.2;
+        let projectileDamage = 34;
 
-// Game state
-const keys = {};
-const projectiles = [];
-const enemies = [];
-const enemyHealthBars = new Map(); // Store health bars for enemies
-let currentWave = 1;
-let enemiesLeftToSpawn = 0;
-const BOUNDARY_SIZE = 24;
-let spawnInterval;
-let isSpawning = false;
+        // Game state
+        const keys = {};
+        const projectiles = [];
+        const enemies = [];
+        const enemyHealthBars = new Map(); // Store health bars for enemies
+        let currentWave = 1;
+        let enemiesLeftToSpawn = 0;
+        const BOUNDARY_SIZE = 24;
+        let spawnInterval;
+        let isSpawning = false;
+        let shieldHealth = 0;
+        let maxShieldHealth = 100;
+        let shieldActive = false;
 
-// Add this line to manage enemy projectiles
-const enemyProjectiles = [];
-
-// Function to create enemy health bar
-function createEnemyHealthBar(enemy) {
-    const healthContainer = document.createElement('div');
-    healthContainer.className = 'enemy-health-container';
-    const healthFill = document.createElement('div');
-    healthFill.className = 'enemy-health-fill';
-    healthContainer.appendChild(healthFill);
-    document.body.appendChild(healthContainer);
-    enemyHealthBars.set(enemy, healthContainer);
-    return healthContainer;
-}
-
-function updateEnemyHealthBar(enemy) {
-    const healthBar = enemyHealthBars.get(enemy);
-    if (healthBar) {
-        const healthPercentage = (enemy.health / 100) * 100;
-        healthBar.children[0].style.width = healthPercentage + '%';
-        
-        // Convert 3D position to screen coordinates
-        const vector = enemy.position.clone();
-        vector.project(camera);
-        
-        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-        const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
-        
-        healthBar.style.left = x + 'px';
-        healthBar.style.top = y + 'px';
-    }
-}
-
-// Enemy projectile management
-function enemyShoot(enemy) {
-    const projectileGeometry = new THREE.SphereGeometry(0.2);
-    const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xff00ff});
-    const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-    projectile.position.copy(enemy.position);
-    
-    const direction = new THREE.Vector3()
-        .subVectors(player.position, enemy.position)
-        .normalize();
-    
-    projectile.velocity = direction.multiplyScalar(0.3);
-    projectile.damage = 10;
-    
-    scene.add(projectile);
-    enemyProjectiles.push(projectile);
-}
-
-// Enemy spawning function
-function spawnEnemy() {
-    if (enemiesLeftToSpawn <= 0) {
-        clearInterval(spawnInterval);
-        isSpawning = false;
-        return;
-    }
-
-    const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const isRanged = currentWave >= 5 && Math.random() < 0.3; // 30% chance for ranged enemy after wave 5
-    const enemyMaterial = new THREE.MeshPhongMaterial({ 
-        color: isRanged ? 0x9900ff : 0xff0000 
-    });
-    const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-    
-    // Ensure enemies spawn away from player
-    do {
-        enemy.position.x = (Math.random() - 0.5) * 40;
-        enemy.position.z = (Math.random() - 0.5) * 40;
-    } while (enemy.position.distanceTo(player.position) < 10);
-    
-    enemy.position.y = 0.5;
-    enemy.health = 100;
-    enemy.speed = 0.05 + (currentWave * 0.01); // Scale speed with wave
-    enemy.isRanged = isRanged;
-    enemy.lastShot = 0; // Track last shot time for ranged enemies
-    scene.add(enemy);
-    enemies.push(enemy);
-    createEnemyHealthBar(enemy);
-    enemiesLeftToSpawn--;
-}
-
-// Function to start a new wave
-function startNewWave() {
-    const baseEnemies = 5;
-    const enemiesPerWave = 2;
-    const bonusEnemiesPerTenWaves = 5;
-    
-    // Calculate total enemies for this wave
-    const bonusEnemies = Math.floor((currentWave - 1) / 10) * bonusEnemiesPerTenWaves;
-    const totalEnemies = baseEnemies + ((currentWave - 1) * enemiesPerWave) + bonusEnemies;
-    
-    enemiesLeftToSpawn = totalEnemies;
-    
-    const waveTitle = document.getElementById('wave-title');
-    const waveCounter = document.getElementById('wave-counter');
-    waveTitle.textContent = `Wave ${currentWave}`;
-    waveCounter.textContent = `Wave: ${currentWave}`;
-    waveTitle.style.display = 'block';
-    setTimeout(() => { waveTitle.style.display = 'none'; }, 2000);
-    
-    // Start spawning enemies
-    if (!isSpawning) {
-        isSpawning = true;
-        spawnInterval = setInterval(spawnEnemy, 1000);
-    }
-}
-
-function removeEnemy(enemy) {
-    const healthBar = enemyHealthBars.get(enemy);
-    if (healthBar) {
-        healthBar.remove();
-        enemyHealthBars.delete(enemy);
-    }
-    scene.remove(enemy);
-    const index = enemies.indexOf(enemy);
-    if (index > -1) {
-        enemies.splice(index, 1);
-    }
-}
-
-function showUpgrades() {
-    document.getElementById('upgrades').style.display = 'block';
-    renderer.domElement.style.filter = 'blur(5px)';
-}
-
-function applyUpgrade(type) {
-    switch(type) {
-        case 'damage':
-            projectileDamage += 10;
-            break;
-        case 'health':
-            maxHealth += 20;
-            playerHealth = maxHealth;
-            updateHealthBar();
-            break;
-        case 'speed':
-            moveSpeed *= 1.1;
-            break;
-    }
-    document.getElementById('upgrades').style.display = 'none';
-    renderer.domElement.style.filter = 'none';
-    startNewWave();
-}
-
-// Event listeners
-window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
-
-window.addEventListener('click', (event) => {
-    if (document.getElementById('upgrades').style.display === 'block') return;
-    
-    const mousePosition = new THREE.Vector2(
-        (event.clientX / window.innerWidth) * 2 - 1,
-        -(event.clientY / window.innerHeight) * 2 + 1
-    );
-    
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mousePosition, camera);
-    
-    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const targetPoint = new THREE.Vector3();
-    raycaster.ray.intersectPlane(floorPlane, targetPoint);
-    
-    const projectileGeometry = new THREE.SphereGeometry(0.2);
-    const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
-    const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-    projectile.position.copy(player.position);
-    
-    const direction = new THREE.Vector3()
-        .subVectors(targetPoint, player.position)
-        .normalize();
-    
-    projectile.velocity = direction.multiplyScalar(0.5);
-    
-    scene.add(projectile);
-    projectiles.push(projectile);
-});
-
-camera.position.set(0, 15, 0);
-camera.lookAt(0, 0, 0);
-
-function updateHealthBar() {
-    const healthFill = document.getElementById('health-fill');
-    healthFill.style.width = `${(playerHealth / maxHealth) * 100}%`;
-}
-
-function animate() {
-    requestAnimationFrame(animate);
-    
-    // Player movement
-    if (keys['w']) player.position.z -= moveSpeed;
-    if (keys['s']) player.position.z += moveSpeed;
-    if (keys['a']) player.position.x -= moveSpeed;
-    if (keys['d']) player.position.x += moveSpeed;
-    
-    // Boundary check for player
-    player.position.x = Math.max(-BOUNDARY_SIZE, Math.min(BOUNDARY_SIZE, player.position.x));
-    player.position.z = Math.max(-BOUNDARY_SIZE, Math.min(BOUNDARY_SIZE, player.position.z));
-    
-    // Update projectiles
-    for (let i = projectiles.length - 1; i >= 0; i--) {
-        const projectile = projectiles[i];
-        projectile.position.add(projectile.velocity);
-        
-        if (projectile.position.length() > 50) {
-            scene.remove(projectile);
-            projectiles.splice(i, 1);
-            continue;
+        // Function to create enemy health bar
+        function createEnemyHealthBar(enemy) {
+            const healthContainer = document.createElement('div');
+            healthContainer.className = 'enemy-health-container';
+            const healthFill = document.createElement('div');
+            healthFill.className = 'enemy-health-fill';
+            healthContainer.appendChild(healthFill);
+            document.body.appendChild(healthContainer);
+            enemyHealthBars.set(enemy, healthContainer);
+            return healthContainer;
         }
-        
-        for (let j = enemies.length - 1; j >= 0; j--) {
-            const enemy = enemies[j];
-            if (projectile.position.distanceTo(enemy.position) < 1) {
-                enemy.health -= projectileDamage;
-                scene.remove(projectile);
-                projectiles.splice(i, 1);
+
+        function updateEnemyHealthBar(enemy) {
+            const healthBar = enemyHealthBars.get(enemy);
+            if (healthBar) {
+                const healthPercentage = (enemy.health / 100) * 100;
+                healthBar.children[0].style.width = healthPercentage + '%';
                 
-                if (enemy.health <= 0) {
-                    removeEnemy(enemy);
-                } else {
-                    updateEnemyHealthBar(enemy);
-                }
-                break;
+                // Convert 3D position to screen coordinates
+                const vector = enemy.position.clone();
+                vector.project(camera);
+                
+                const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+                
+                healthBar.style.left = x + 'px';
+                healthBar.style.top = y + 'px';
             }
         }
-    }
-    
-    // Update enemies
-    for (const enemy of enemies) {
-        if (enemy.isRanged) {
-            // Ranged enemies maintain distance and shoot
-            const distanceToPlayer = enemy.position.distanceTo(player.position);
-            if (distanceToPlayer < 15) {
-                // Move away if too close
-                const direction = new THREE.Vector3()
-                    .subVectors(enemy.position, player.position)
-                    .normalize();
-                enemy.position.add(direction.multiplyScalar(enemy.speed));
-            } else if (distanceToPlayer > 20) {
-                // Move closer if too far
-                const direction = new THREE.Vector3()
-                    .subVectors(player.position, enemy.position)
-                    .normalize();
-                enemy.position.add(direction.multiplyScalar(enemy.speed));
-            }
 
-            // Shoot at intervals
-            const currentTime = Date.now();
-            if (currentTime - enemy.lastShot > 2000) { // Shoot every 2 seconds
-                enemyShoot(enemy);
-                enemy.lastShot = currentTime;
-            }
-        } else {
-            // Melee enemies chase player
+        // Enemy projectile management
+        function enemyShoot(enemy) {
+            const projectileGeometry = new THREE.SphereGeometry(0.2);
+            const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xff00ff});
+            const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+            projectile.position.copy(enemy.position);
+            
             const direction = new THREE.Vector3()
                 .subVectors(player.position, enemy.position)
                 .normalize();
-            enemy.position.add(direction.multiplyScalar(enemy.speed));
-        }
-        
-        updateEnemyHealthBar(enemy);
-        
-        if (!enemy.isRanged && enemy.position.distanceTo(player.position) < 1) {
-            playerHealth -= 1;
-            updateHealthBar();
-            if (playerHealth <= 0) {
-                alert('Game Over!');
-                location.reload();
-            }
-        }
-    }
-    
-    // Update enemy projectiles
-    for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
-        const projectile = enemyProjectiles[i];
-        projectile.position.add(projectile.velocity);
-        
-        if (projectile.position.length() > 50) {
-            scene.remove(projectile);
-            enemyProjectiles.splice(i, 1);
-            continue;
-        }
-        
-        if (projectile.position.distanceTo(player.position) < 1) {
-            playerHealth -= projectile.damage;
-            updateHealthBar();
-            scene.remove(projectile);
-            enemyProjectiles.splice(i, 1);
             
-            if (playerHealth <= 0) {
-                alert('Game Over!');
-                location.reload();
+            projectile.velocity = direction.multiplyScalar(0.3);
+            projectile.damage = 10;
+            
+            scene.add(projectile);
+            enemyProjectiles.push(projectile);
+        }
+
+        // Enemy spawning function
+        function spawnEnemy() {
+            if (enemiesLeftToSpawn <= 0) {
+                clearInterval(spawnInterval);
+                isSpawning = false;
+                return;
+            }
+
+            const isRanged = currentWave >= 10 && Math.random() < 0.25; // Ranged enemies start at wave 10
+            const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const enemyMaterial = new THREE.MeshPhongMaterial({ 
+                color: isRanged ? 0x9900ff : 0xff0000 
+            });
+            const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+            
+            // Ensure enemies spawn away from player
+            do {
+                enemy.position.x = (Math.random() - 0.5) * 40;
+                enemy.position.z = (Math.random() - 0.5) * 40;
+            } while (enemy.position.distanceTo(player.position) < 10);
+            
+            enemy.position.y = 0.5;
+            enemy.health = 100;
+            enemy.speed = 0.05 + (currentWave * 0.01); // Scale speed with wave
+            enemy.isRanged = isRanged;
+            enemy.lastShot = 0; // Track last shot time for ranged enemies
+            enemy.damage = currentWave >= 5 ? 10 + Math.floor(currentWave / 2) : 5; // Increase damage of melee enemies after wave 5
+            
+            scene.add(enemy);
+            enemies.push(enemy);
+            createEnemyHealthBar(enemy);
+            enemiesLeftToSpawn--;
+        }
+
+        // Function to start a new wave
+        function startNewWave() {
+            currentWave++;
+            const baseEnemies = 5;
+            const enemiesPerWave = 2;
+            const bonusEnemiesPerTenWaves = 5;
+            
+            // Calculate total enemies for this wave
+            const bonusEnemies = Math.floor((currentWave - 1) / 10) * bonusEnemiesPerTenWaves;
+            const totalEnemies = baseEnemies + ((currentWave - 1) * enemiesPerWave) + bonusEnemies;
+            
+            enemiesLeftToSpawn = totalEnemies;
+            
+            const waveTitle = document.getElementById('wave-title');
+            const waveCounter = document.getElementById('wave-counter');
+            waveTitle.textContent = `Wave ${currentWave}`;
+            waveCounter.textContent = `Wave: ${currentWave}`;
+            waveTitle.style.display = 'block';
+            setTimeout(() => { waveTitle.style.display = 'none'; }, 2000);
+            
+            // Start spawning enemies
+            if (!isSpawning) {
+                isSpawning = true;
+                spawnInterval = setInterval(spawnEnemy, 1000);
             }
         }
-    }
 
-    // Check if wave is complete
-    if (enemies.length === 0 && enemiesLeftToSpawn === 0 && !isSpawning) {
-        currentWave++;
-        showUpgrades();
-    }
-    
-    renderer.render(scene, camera);
-}
+        function removeEnemy(enemy) {
+            const healthBar = enemyHealthBars.get(enemy);
+            if (healthBar) {
+                healthBar.remove();
+                enemyHealthBars.delete(enemy);
+            }
+            scene.remove(enemy);
+            const index = enemies.indexOf(enemy);
+            if (index > -1) {
+                enemies.splice(index, 1);
+            }
+        }
 
-// Start the game
-startNewWave();
-animate();
-</script>
+        function clearEnemies() {
+            for (const enemy of enemies) {
+                removeEnemy(enemy);
+            }
+            enemies.length = 0; // Clear enemies array
+        }
+
+        function showUpgrades() {
+            document.getElementById('upgrades').style.display = 'block';
+            renderer.domElement.style.filter = 'blur(5px)';
+        }
+
+        function applyUpgrade(type) {
+            switch(type) {
+                case 'damage':
+                    projectileDamage += 10;
+                    break;
+                case 'health':
+                    maxHealth += 20;
+                    playerHealth = maxHealth;
+                    updateHealthBar();
+                    break;
+                case 'speed':
+                    moveSpeed *= 1.1;
+                    break;
+                case 'shield':
+                    if (currentWave >= 10 && shieldHealth === 0) {
+                        shieldHealth = maxShieldHealth;
+                        shieldActive = true;
+                        document.getElementById('shield-bar').style.display = 'block'; // Show the shield bar
+                    }
+                    break;
+            }
+            document.getElementById('upgrades').style.display = 'none';
+            renderer.domElement.style.filter = 'none';
+            startNewWave();
+        }
+
+        // Event listeners
+        window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+        window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+        window.addEventListener('click', (event) => {
+            if (document.getElementById('upgrades').style.display === 'block') return;
+            
+            const mousePosition = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+            
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mousePosition, camera);
+            
+            const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const targetPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(floorPlane, targetPoint);
+            
+            const projectileGeometry = new THREE.SphereGeometry(0.2);
+            const projectileMaterial = new THREE.MeshPhongMaterial({color: 0xffff00});
+            const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+            projectile.position.copy(player.position);
+            
+            const direction = new THREE.Vector3()
+                .subVectors(targetPoint, player.position)
+                .normalize();
+            
+            projectile.velocity = direction.multiplyScalar(0.5);
+            
+            scene.add(projectile);
+            projectiles.push(projectile);
+        });
+
+        camera.position.set(0, 15, 0);
+        camera.lookAt(0, 0, 0);
+
+        function updateHealthBar() {
+            const healthFill = document.getElementById('health-fill');
+            healthFill.style.width = `${(playerHealth / maxHealth) * 100}%`;
+        }
+
+        function updateShieldBar() {
+            if (shieldActive) {
+                const shieldFill = document.getElementById('shield-fill');
+                shieldFill.style.width = `${(shieldHealth / maxShieldHealth) * 100}%`;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Player movement
+            if (keys['w']) player.position.z -= moveSpeed;
+            if (keys['s']) player.position.z += moveSpeed;
+            if (keys['a']) player.position.x -= moveSpeed;
+            if (keys['d']) player.position.x += moveSpeed;
+            
+            // Boundary check for player
+            player.position.x = Math.max(-BOUNDARY_SIZE, Math.min(BOUNDARY_SIZE, player.position.x));
+            player.position.z = Math.max(-BOUNDARY_SIZE, Math.min(BOUNDARY_SIZE, player.position.z));
+            
+            // Update projectiles
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const projectile = projectiles[i];
+                projectile.position.add(projectile.velocity);
+                
+                if (projectile.position.length() > 50) {
+                    scene.remove(projectile);
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+                
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+                    if (projectile.position.distanceTo(enemy.position) < 1) {
+                        enemy.health -= projectileDamage;
+                        scene.remove(projectile);
+                        projectiles.splice(i, 1);
+                        
+                        if (enemy.health <= 0) {
+                            removeEnemy(enemy);
+                        } else {
+                            updateEnemyHealthBar(enemy);
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Update enemies
+            for (const enemy of enemies) {
+                if (enemy.isRanged) {
+                    // Ranged enemies maintain distance and shoot
+                    const distanceToPlayer = enemy.position.distanceTo(player.position);
+                    if (distanceToPlayer < 15) {
+                        // Move away if too close
+                        const direction = new THREE.Vector3()
+                            .subVectors(enemy.position, player.position)
+                            .normalize();
+                        enemy.position.add(direction.multiplyScalar(enemy.speed));
+                    } else if (distanceToPlayer > 20) {
+                        // Move closer if too far
+                        const direction = new THREE.Vector3()
+                            .subVectors(player.position, enemy.position)
+                            .normalize();
+                        enemy.position.add(direction.multiplyScalar(enemy.speed));
+                    }
+
+                    // Shoot at intervals
+                    const currentTime = Date.now();
+                    if (currentTime - enemy.lastShot > 2000) { // Shoot every 2 seconds
+                        enemyShoot(enemy);
+                        enemy.lastShot = currentTime;
+                    }
+                } else {
+                    // Melee enemies chase player
+                    const direction = new THREE.Vector3()
+                        .subVectors(player.position, enemy.position)
+                        .normalize();
+                    enemy.position.add(direction.multiplyScalar(enemy.speed));
+                }
+                
+                updateEnemyHealthBar(enemy);
+                
+                // Red enemies disappear after damaging the player
+                if (enemy.material.color.getHex() === 0xff0000 && enemy.position.distanceTo(player.position) < 1) {
+                    playerHealth -= 1;
+                    updateHealthBar();
+                    removeEnemy(enemy); // Remove the red enemy
+                }
+
+                // Melee enemies hit the player
+                if (!enemy.isRanged && enemy.position.distanceTo(player.position) < 1) {
+                    if (shieldActive) {
+                        shieldHealth -= enemy.damage;
+                        updateShieldBar();
+                    } else {
+                        playerHealth -= enemy.damage;
+                        updateHealthBar();
+                    }
+
+                    if (playerHealth <= 0) {
+                        alert('Game Over!');
+                        location.reload();
+                    }
+                    removeEnemy(enemy); // Remove the enemy
+                }
+            }
+            
+            // Check if wave is complete
+            if (enemies.length === 0 && enemiesLeftToSpawn === 0 && !isSpawning) {
+                clearEnemies(); // Clear all enemies after wave
+                showUpgrades();
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // Start the game
+        startNewWave();
+        animate();
+    </script>
 </body>
 </html>
